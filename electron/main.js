@@ -75,7 +75,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'GPDC Dashboards',
+    title: 'GPDC Dashboard',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 15, y: 15 },
     backgroundColor: '#f5f3f0',
