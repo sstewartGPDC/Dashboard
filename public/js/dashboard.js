@@ -27,10 +27,10 @@ function updateActivePill() { const pill = $("activeFilterPill"); const n = acti
 function circuitMatchesSearch(c) { const q = ui.q.trim().toLowerCase(); return !q || c.circuit.toLowerCase().includes(q) || c.counties.some(cty => cty.toLowerCase().includes(q)); }
 function getFilteredCircuits() { return CIRCUITS.filter(c => (ui.circuit === "All" || c.circuit === ui.circuit) && (ui.county === "All" || c.counties.includes(ui.county)) && circuitMatchesSearch(c)); }
 
-function aggregateMetrics(filteredCircuits) {
+function aggregateMetricsFrom(map, filteredCircuits) {
   const agg = { totalCases: 0, newCases: 0, closed: 0, stateFilled: 0, stateVacant: 0, countyAttorneys: 0, conflict: { newCases: 0, totalContractors: 0 } };
   for (const c of filteredCircuits) {
-    const m = CIRCUIT_METRICS.get(c.circuit);
+    const m = map && map.get(c.circuit);
     if (!m) continue;
     agg.totalCases += m.totalCases; agg.newCases += m.newCases; agg.closed += m.closed;
     agg.stateFilled += m.stateFilled; agg.stateVacant += m.stateVacant;
@@ -40,6 +40,7 @@ function aggregateMetrics(filteredCircuits) {
   }
   return agg;
 }
+function aggregateMetrics(filteredCircuits) { return aggregateMetricsFrom(CIRCUIT_METRICS, filteredCircuits); }
 
 function getActiveCategories(agg) {
   return {
@@ -509,7 +510,7 @@ function renderLineChart(containerId, data, colorClass) {
 }
 
 // ─── KPI Card Renderer ──────────────────────────────────────────────
-function renderKpiCard(containerId, value, label, subtitle, iconName, format, editCallback) {
+function renderKpiCard(containerId, value, label, subtitle, iconName, format, editCallback, deltaHtml) {
   const el = $(containerId);
   if (!el) return;
   const iconSvg = KPI_ICONS[iconName] || KPI_ICONS.folder;
@@ -517,6 +518,7 @@ function renderKpiCard(containerId, value, label, subtitle, iconName, format, ed
     <div class="kpi-icon-dynamic">${iconSvg}</div>
     <div class="kpi-value-dynamic${editCallback ? ' editable-value' : ''}" title="${editCallback ? 'Click to edit' : ''}">${value}</div>
     <div class="kpi-label-dynamic">${label}</div>
+    ${deltaHtml ? `<div class="kpi-delta-wrap">${deltaHtml}</div>` : ''}
     ${subtitle ? `<div class="kpi-subtitle-dynamic">${subtitle}</div>` : ''}
   </div>`;
   // Wire inline editing if callback provided

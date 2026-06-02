@@ -506,8 +506,28 @@ const chartEngine = {
         this.saveDashboard();
         this._renderCardContent(config);
       };
-      renderKpiCard(bodyId, formattedValue, config.title, config.subtitle || '', config.icon || 'folder', config.format || 'number', editCb);
+      renderKpiCard(bodyId, formattedValue, config.title, config.subtitle || '', config.icon || 'folder', config.format || 'number', editCb, this._fieldDelta(config));
+    } else if (config.type === 'scorecard') {
+      renderScorecard(bodyId, config);
+    } else if (config.type === 'compare') {
+      renderCompareCard(bodyId, config);
     }
+  },
+
+  // Year-over-year delta badge for a field-bound card (KPI/stat). '' if no
+  // comparison year, a hand-typed override, or no prior data.
+  _fieldDelta(config) {
+    if (!window.__compareFY) return '';
+    if (config.valueOverride !== undefined && config.valueOverride !== null) return '';
+    if (typeof yoyDeltaBadge !== 'function') return '';
+    const fd = CHART_FIELDS[config.field];
+    if (!fd) return '';
+    if (typeof CIRCUIT_METRICS_PRIOR === 'undefined' || !CIRCUIT_METRICS_PRIOR.size) return '';
+    const fc = getFilteredCircuits();
+    const cur = fd.getAgg(aggregateMetricsFrom(CIRCUIT_METRICS, fc));
+    const prior = fd.getAgg(aggregateMetricsFrom(CIRCUIT_METRICS_PRIOR, fc));
+    const pol = (typeof YOY_FIELD_POLARITY !== 'undefined' && YOY_FIELD_POLARITY[config.field]) || 'neutral';
+    return yoyDeltaBadge(cur, prior, pol, ' YoY');
   },
 
   // ── Inline Value Editing (segment charts) ─────────────────────
@@ -769,6 +789,10 @@ const chartEngine = {
     } else if (config.type === 'kpi') {
       const { formattedValue } = this._resolveKpiData(config);
       renderKpiCard(bodyId, formattedValue, config.title, config.subtitle || '', config.icon || 'folder', config.format || 'number');
+    } else if (config.type === 'scorecard') {
+      renderScorecard(bodyId, config);
+    } else if (config.type === 'compare') {
+      renderCompareCard(bodyId, config);
     }
   },
 
@@ -851,6 +875,24 @@ const chartEngine = {
       if (config.valueOverride !== undefined && config.valueOverride !== null) {
         html += '<div class="editor-row"><button class="editor-reset-override-btn" data-reset="valueOverride">Reset Value to Data</button></div>';
       }
+    }
+
+    if (config.type === 'compare') {
+      html += '<div class="editor-row"><label>Data Field</label><select data-edit="field">';
+      Object.entries(CHART_FIELDS).forEach(([key, f]) => {
+        html += '<option value="' + key + '"' + (config.field === key ? ' selected' : '') + '>' + f.label + '</option>';
+      });
+      html += '</select></div>';
+      html += '<div class="editor-row"><label>Show Top</label><select data-edit="limit">';
+      [5, 8, 10, 15, 20].forEach(n => {
+        html += '<option value="' + n + '"' + (Number(config.limit || 8) === n ? ' selected' : '') + '>' + n + ' circuits</option>';
+      });
+      html += '</select></div>';
+    }
+
+    if (config.type === 'scorecard') {
+      html += '<div class="editor-row"><label>Standard (cases / attorney)</label><input type="number" min="1" step="1" data-edit="standard" value="' + (Number(config.standard) || 150) + '"></div>';
+      html += '<div class="editor-row"><div class="editor-hint">Circuits above this caseload are flagged red. Set to your agency&rsquo;s adopted maximum.</div></div>';
     }
 
     // Reset overrides button for segment charts
@@ -1430,6 +1472,20 @@ const chartEngine = {
       +       '<div class="chart-add-option-desc">Display a single key metric</div>'
       +     '</div>'
       +   '</button>'
+      +   '<button class="chart-add-option" data-type="scorecard">'
+      +     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'
+      +     '<div>'
+      +       '<div class="chart-add-option-label">Circuit Scorecard</div>'
+      +       '<div class="chart-add-option-desc">Caseload vs. standard, flags over-max circuits</div>'
+      +     '</div>'
+      +   '</button>'
+      +   '<button class="chart-add-option" data-type="compare">'
+      +     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="20" x2="7" y2="10"/><line x1="11" y1="20" x2="11" y2="4"/><line x1="15" y1="20" x2="15" y2="13"/><line x1="19" y1="20" x2="19" y2="7"/></svg>'
+      +     '<div>'
+      +       '<div class="chart-add-option-label">Year-over-Year</div>'
+      +       '<div class="chart-add-option-desc">Current vs. prior year, grouped bars</div>'
+      +     '</div>'
+      +   '</button>'
       + '</div>';
     const addBtn = addWrap.querySelector('#chartAddBtn');
     const picker = addWrap.querySelector('#chartAddPicker');
@@ -1476,6 +1532,10 @@ const chartEngine = {
       newCard = { id, type: 'line', title: 'New Line Chart', subtitle: 'Click to configure', width: 'medium', ...barDefaults };
     } else if (type === 'stat') {
       newCard = { id, type: 'stat', title: 'New Stat Card', subtitle: 'Click to configure', width: 'medium', field: 'totalCases', format: 'number' };
+    } else if (type === 'scorecard') {
+      newCard = { id, type: 'scorecard', title: 'Circuit Scorecard', subtitle: 'Caseload vs. standard', width: 'full', standard: 150 };
+    } else if (type === 'compare') {
+      newCard = { id, type: 'compare', title: 'Year-over-Year', subtitle: 'Current vs. prior year', width: 'large', field: 'totalCases', limit: 8 };
     } else {
       newCard = { id, type: 'bar', title: 'New Bar Chart', subtitle: 'Click to configure', width: 'medium', ...barDefaults };
     }

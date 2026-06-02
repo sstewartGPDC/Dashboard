@@ -4,6 +4,32 @@
 // metrics, and renders a variance strip. Driven by the period/compare
 // selectors wired in app.js. Does not touch the chart engine.
 
+// Whether a rising value is good/bad/neutral, per chart field.
+const YOY_FIELD_POLARITY = {
+  totalCases: 'neutral', newCases: 'neutral', closed: 'goodUp',
+  stateFilled: 'goodUp', stateVacant: 'badUp', countyAttorneys: 'neutral',
+  totalAttorneys: 'goodUp', caseload: 'badUp', vacancyRate: 'badUp',
+  activeRemaining: 'neutral', conflictNew: 'neutral', conflictContractors: 'neutral',
+};
+
+// Build a ▲▼ delta badge comparing cur vs prior, colored by polarity.
+// Returns '' when there's no usable prior value.
+function yoyDeltaBadge(cur, prior, polarity, suffix) {
+  if (prior === 0 || prior == null || cur == null) return '';
+  const change = (cur - prior) / Math.abs(prior);
+  const up = change > 0.0005, down = change < -0.0005;
+  const arrow = up ? '▲' : down ? '▼' : '–';
+  let cls = 'yoy-flat';
+  if (up || down) {
+    const good = (polarity === 'goodUp' && up) || (polarity === 'badUp' && down);
+    const bad = (polarity === 'badUp' && up) || (polarity === 'goodUp' && down);
+    cls = good ? 'yoy-pos' : bad ? 'yoy-neg' : 'yoy-flat';
+  }
+  const pc = change * 100;
+  const sign = pc > 0 ? '+' : '';
+  return `<span class="kpi-delta ${cls}">${arrow} ${sign}${pc.toFixed(1)}%${suffix || ''}</span>`;
+}
+
 // Statewide aggregate over a CIRCUIT_METRICS-shaped Map.
 function yoyAggregate(map) {
   const a = { totalCases: 0, newCases: 0, closed: 0, stateFilled: 0, stateVacant: 0, countyAttorneys: 0, conflictNew: 0, contractors: 0 };
@@ -59,6 +85,101 @@ function yoyFmt(v, fmt) {
 
 function yoyFyLabel(fy) {
   return fy ? 'FY' + String(fy).slice(-2) : '';
+}
+
+// ─── Circuit Scorecard ───────────────────────────────────────────────
+// Per-circuit caseload vs a configurable standard, benchmark-colored, with an
+// optional year-over-year column. The headline metric for external reporting.
+function scorecardRows() {
+  const fc = getFilteredCircuits();
+  const priorOn = !!window.__compareFY && typeof CIRCUIT_METRICS_PRIOR !== 'undefined' && CIRCUIT_METRICS_PRIOR.size;
+  return fc.map((c) => {
+    const m = CIRCUIT_METRICS.get(c.circuit) || emptyMetrics();
+    const att = m.stateFilled + m.countyAttorneys;
+    const caseload = att > 0 ? m.totalCases / att : 0;
+    let priorCaseload = null;
+    if (priorOn) {
+      const pm = CIRCUIT_METRICS_PRIOR.get(c.circuit);
+      if (pm) { const pa = pm.stateFilled + pm.countyAttorneys; priorCaseload = pa > 0 ? pm.totalCases / pa : null; }
+    }
+    return { circuit: c.circuit, cases: m.totalCases, attorneys: att, caseload, priorCaseload };
+  }).filter((r) => r.attorneys > 0 || r.cases > 0);
+}
+
+function renderScorecard(bodyId, config) {
+  const el = document.getElementById(bodyId);
+  if (!el) return;
+  const std = Number(config.standard) > 0 ? Number(config.standard) : 150;
+  const rows = scorecardRows().sort((a, b) => b.caseload - a.caseload);
+  if (!rows.length) { el.innerHTML = '<div class="empty-state">No circuit data. Upload data to populate the scorecard.</div>'; return; }
+  const over = rows.filter((r) => r.caseload > std).length;
+  const compareOn = !!window.__compareFY && typeof CIRCUIT_METRICS_PRIOR !== 'undefined' && CIRCUIT_METRICS_PRIOR.size;
+
+  const body = rows.map((r) => {
+    const ratio = std > 0 ? r.caseload / std : 0;
+    const cls = r.caseload > std ? 'sc-over' : ratio >= 0.85 ? 'sc-warn' : 'sc-ok';
+    const flag = r.caseload > std ? '<span class="sc-flag">OVER</span>' : '';
+    const deltaCell = compareOn
+      ? `<td class="sc-delta">${r.priorCaseload ? yoyDeltaBadge(r.caseload, r.priorCaseload, 'badUp', '') : '<span class="yoy-flat">—</span>'}</td>`
+      : '';
+    return `<tr>
+      <td class="sc-circuit">${r.circuit}</td>
+      <td>${fmt(r.cases)}</td>
+      <td>${fmt(r.attorneys)}</td>
+      <td class="sc-caseload ${cls}">${r.caseload.toFixed(1)} ${flag}</td>
+      <td class="sc-bar"><div class="sc-bar-track"><div class="sc-bar-fill ${cls}" style="width:${Math.min(ratio * 100, 100).toFixed(0)}%"></div></div></td>
+      ${deltaCell}
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="sc-summary"><span class="sc-summary-num ${over > 0 ? 'sc-over' : 'sc-ok'}">${over}</span> of ${rows.length} circuits over the standard of ${fmt(std)} cases / attorney</div>
+    <div class="sc-table-wrap"><table class="sc-table">
+      <thead><tr><th>Circuit</th><th>Cases</th><th>Attys</th><th>Caseload</th><th>vs Standard</th>${compareOn ? '<th>YoY</th>' : ''}</tr></thead>
+      <tbody>${body}</tbody>
+    </table></div>`;
+}
+
+// ─── Year-over-Year comparison card (grouped bars) ───────────────────
+function renderCompareCard(bodyId, config) {
+  const el = document.getElementById(bodyId);
+  if (!el) return;
+  if (!window.__compareFY || typeof CIRCUIT_METRICS_PRIOR === 'undefined' || !CIRCUIT_METRICS_PRIOR.size) {
+    el.innerHTML = '<div class="empty-state">Pick a “Compare” year in the toolbar to show year-over-year bars.</div>';
+    return;
+  }
+  const fd = typeof CHART_FIELDS !== 'undefined' && CHART_FIELDS[config.field || 'totalCases'];
+  if (!fd) { el.innerHTML = '<div class="empty-state">Unknown metric.</div>'; return; }
+
+  const fc = getFilteredCircuits();
+  let rows = fc.map((c) => {
+    const m = CIRCUIT_METRICS.get(c.circuit) || emptyMetrics();
+    const pm = CIRCUIT_METRICS_PRIOR.get(c.circuit);
+    return { label: c.circuit, cur: fd.getCircuit(m), prior: pm ? fd.getCircuit(pm) : 0 };
+  }).filter((r) => r.cur > 0 || r.prior > 0);
+  rows.sort((a, b) => b.cur - a.cur);
+  rows = rows.slice(0, config.limit || 8);
+  if (!rows.length) { el.innerHTML = '<div class="empty-state">No data.</div>'; return; }
+
+  const maxVal = Math.max(1, ...rows.map((r) => Math.max(r.cur, r.prior)));
+  const curLbl = yoyFyLabel(window.__currentFY);
+  const priLbl = yoyFyLabel(window.__compareFY);
+  const bars = rows.map((r) => {
+    const ch = Math.max((r.cur / maxVal) * 100, 1.5);
+    const ph = Math.max((r.prior / maxVal) * 100, 1.5);
+    const short = r.label.length > 6 ? r.label.slice(0, 5) + '…' : r.label;
+    return `<div class="cmp-group" title="${r.label} — ${priLbl}: ${fmt(r.prior)}, ${curLbl}: ${fmt(r.cur)}">
+      <div class="cmp-bars">
+        <div class="cmp-bar cmp-prior" style="height:${ph}%"></div>
+        <div class="cmp-bar cmp-cur" style="height:${ch}%"></div>
+      </div>
+      <div class="cmp-label">${short}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="cmp-legend"><span class="cmp-key cmp-prior"></span>${priLbl}<span class="cmp-key cmp-cur"></span>${curLbl}</div>
+    <div class="cmp-chart">${bars}</div>`;
 }
 
 function renderYoY() {

@@ -1025,6 +1025,40 @@
         .yoy-pos { color:#2e7d32; }
         .yoy-neg { color:#c0392b; }
         .yoy-flat { color:#8a8a8a; }
+
+        /* Per-card YoY delta badge */
+        .kpi-delta-wrap { margin-top:0.35rem; }
+        .kpi-delta { display:inline-flex; align-items:center; gap:0.2rem; font-family:'JetBrains Mono',monospace; font-size:0.72rem; font-weight:700; }
+
+        /* Circuit Scorecard */
+        .sc-summary { font-size:0.85rem; color:var(--text-medium,#4a4a4a); margin-bottom:0.7rem; }
+        .sc-summary-num { font-weight:800; font-size:1.05rem; }
+        .sc-table-wrap { overflow-x:auto; }
+        .sc-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+        .sc-table th { text-align:left; font-size:0.66rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-light,#6b6b6b); font-weight:700; padding:0.4rem 0.6rem; border-bottom:1px solid var(--border-light,#e5e2dd); white-space:nowrap; }
+        .sc-table td { padding:0.45rem 0.6rem; border-bottom:1px solid var(--border-light,#eee); font-family:'JetBrains Mono',monospace; white-space:nowrap; }
+        .sc-table td.sc-circuit { font-family:'Manrope',sans-serif; font-weight:600; }
+        .sc-caseload { font-weight:700; }
+        .sc-ok { color:#2e7d32; } .sc-warn { color:#b7791f; } .sc-over { color:#c0392b; }
+        .sc-flag { font-size:0.58rem; font-weight:800; background:#c0392b; color:#fff; padding:0.05rem 0.3rem; border-radius:4px; margin-left:0.3rem; vertical-align:middle; letter-spacing:0.03em; }
+        .sc-bar { width:120px; }
+        .sc-bar-track { height:7px; background:var(--border-light,#e5e2dd); border-radius:4px; overflow:hidden; }
+        .sc-bar-fill { height:100%; border-radius:4px; }
+        .sc-bar-fill.sc-ok { background:#5fa87a; } .sc-bar-fill.sc-warn { background:#e0a93f; } .sc-bar-fill.sc-over { background:#d45454; }
+        .sc-delta { font-size:0.72rem; }
+
+        /* Year-over-Year comparison card */
+        .cmp-legend { display:flex; align-items:center; gap:0.3rem; font-size:0.72rem; color:var(--text-medium,#4a4a4a); font-family:'JetBrains Mono',monospace; margin-bottom:0.5rem; }
+        .cmp-key { width:11px; height:11px; border-radius:3px; display:inline-block; margin-left:0.6rem; }
+        .cmp-key.cmp-prior { background:#cbb9a8; } .cmp-key.cmp-cur { background:var(--primary,#B85C38); }
+        .cmp-chart { display:flex; align-items:flex-end; gap:0.5rem; height:180px; padding-top:0.5rem; }
+        .cmp-group { flex:1; display:flex; flex-direction:column; align-items:center; height:100%; }
+        .cmp-bars { display:flex; align-items:flex-end; gap:3px; height:100%; width:100%; justify-content:center; }
+        .cmp-bar { width:42%; max-width:22px; border-radius:4px 4px 0 0; transition:height 0.3s ease; }
+        .cmp-bar.cmp-prior { background:#cbb9a8; } .cmp-bar.cmp-cur { background:var(--primary,#B85C38); }
+        .cmp-label { font-size:0.66rem; color:var(--text-medium,#4a4a4a); margin-top:0.3rem; font-family:'JetBrains Mono',monospace; }
+
+        .editor-hint { font-size:0.72rem; color:var(--text-light,#888); line-height:1.4; }
       </style>
     </div>
 
