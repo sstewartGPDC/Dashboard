@@ -4,6 +4,14 @@ compatibility_date = "2024-09-23"
 # SheetJS reaches for Buffer; nodejs_compat provides it (proven in the POC).
 compatibility_flags = ["nodejs_compat"]
 
+# Serve the app at its own subdomain on the gapubdef.org zone. On `wrangler
+# deploy` this creates the DNS record + cert automatically (the zone must be in
+# the same Cloudflare account). Put a Cloudflare Access policy on this hostname
+# — the same one that protects /intranet — so it's staff-gated.
+routes = [
+  { pattern = "dashboard.gapubdef.org", custom_domain = true },
+]
+
 # Serve the existing frontend (public/) as static assets. The Worker handles
 # /api/* and falls through to assets for everything else.
 [assets]
