@@ -463,9 +463,9 @@ const chartEngine = {
       }
       html += '</div>';
       el.innerHTML = html;
-      // Wire inline editing for stat value
+      // Wire inline editing for stat value (disabled when locked)
       const statValEl = el.querySelector('.chart-stat-value');
-      if (statValEl) {
+      if (statValEl && !this.locked) {
         const self = this;
         statValEl.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -506,7 +506,7 @@ const chartEngine = {
         this.saveDashboard();
         this._renderCardContent(config);
       };
-      renderKpiCard(bodyId, formattedValue, config.title, config.subtitle || '', config.icon || 'folder', config.format || 'number', editCb, this._fieldDelta(config));
+      renderKpiCard(bodyId, formattedValue, config.title, config.subtitle || '', config.icon || 'folder', config.format || 'number', this.locked ? null : editCb, this._fieldDelta(config));
     } else if (config.type === 'scorecard') {
       renderScorecard(bodyId, config);
     } else if (config.type === 'compare') {
@@ -533,6 +533,7 @@ const chartEngine = {
   // ── Inline Value Editing (segment charts) ─────────────────────
 
   _wireSegmentValueEditing(bodyId, config) {
+    if (this.locked) return;
     const el = document.getElementById(bodyId);
     if (!el) return;
     const self = this;
@@ -582,6 +583,7 @@ const chartEngine = {
   },
 
   _wireBarValueEditing(bodyId, config) {
+    if (this.locked) return;
     const el = document.getElementById(bodyId);
     if (!el) return;
     const self = this;

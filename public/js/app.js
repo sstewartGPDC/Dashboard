@@ -524,6 +524,20 @@ async function initApp() {
     });
   }
 
+  // 7b. Data export (Excel / CSV)
+  const xlsxBtn = $('exportXlsxBtn');
+  if (xlsxBtn) xlsxBtn.addEventListener('click', () => { if (typeof exportData === 'function') exportData('xlsx'); });
+  const csvBtn = $('exportCsvBtn');
+  if (csvBtn) csvBtn.addEventListener('click', () => { if (typeof exportData === 'function') exportData('csv'); });
+
+  // 7c. Templates gallery
+  const tplBtn = $('dashboardTemplateBtn');
+  if (tplBtn) tplBtn.addEventListener('click', (e) => { e.stopPropagation(); if (typeof openTemplateGallery === 'function') openTemplateGallery(); });
+
+  // 7d. Lock / present mode
+  const lockBtn = $('lockToggleBtn');
+  if (lockBtn) lockBtn.addEventListener('click', () => { if (typeof toggleLock === 'function') toggleLock(); });
+
   // 8. Header dropdowns
   setupDropdown('exportDropdownBtn', 'exportDropdown');
   setupDropdown('userDropdownBtn', 'userDropdown');
