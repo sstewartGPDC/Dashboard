@@ -23,15 +23,15 @@ binding = "ASSETS"
 binding = "DB"
 database_name = "gpdc_dashboard"
 # Replace with the real id from `wrangler d1 create gpdc_dashboard` before deploy.
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "3ed6279b-0ec0-4cff-9a2c-4d9eb387d909"
 
 # Short-lived storage for the two-step upload (preview-headers -> upload-mapped).
 [[kv_namespaces]]
 binding = "TEMP_UPLOADS"
-id = "00000000000000000000000000000000"
+id = "2ccf255aed7e4c23bee4bed9cd7aea80"
 
 [vars]
 # Comma-separated emails granted the 'admin' role. In production these are the
 # same identities you'd put in the Cloudflare Access policy as admins.
 # 'dev@local' is the fallback identity used in local `wrangler dev` (no Access).
-ADMIN_EMAILS = "dev@local"
+ADMIN_EMAILS = "dev@local, sstewart@gapubdef.org"
