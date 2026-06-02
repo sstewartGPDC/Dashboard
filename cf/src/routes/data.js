@@ -26,10 +26,18 @@ function xlsxResponse(bytes, filename) {
   });
 }
 
-async function persistUpload(db, { userId, filename, isShared, rows }) {
+// Georgia fiscal year runs Jul 1–Jun 30; FY is labeled by the calendar year it
+// ends in (e.g. Jul 2024–Jun 2025 = FY2025). Used as the default when an upload
+// doesn't specify one.
+function currentFiscalYear() {
+  const now = new Date();
+  return now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear();
+}
+
+async function persistUpload(db, { userId, filename, isShared, rows, fiscalYear, period }) {
   const up = await db.run(
-    'INSERT INTO upload_history (user_id, filename, is_shared) VALUES (?, ?, ?) RETURNING id',
-    [userId, filename, isShared ? 1 : 0]
+    'INSERT INTO upload_history (user_id, filename, fiscal_year, period, is_shared) VALUES (?, ?, ?, ?, ?) RETURNING id',
+    [userId, filename, fiscalYear, period || 'annual', isShared ? 1 : 0]
   );
   const uploadId = up.lastID;
   await db.batch(
@@ -43,29 +51,91 @@ async function persistUpload(db, { userId, filename, isShared, rows }) {
   return uploadId;
 }
 
-// GET /api/data?source=auto|personal|shared
+// Find the most recent upload id for a scope, optionally pinned to a fiscal
+// year + period. Returns { id, fiscal_year, period } or null.
+async function findUpload(db, { userId, scope, fy, period }) {
+  const where = scope === 'shared' ? 'is_shared = 1' : 'user_id = ? AND is_shared = 0';
+  const params = scope === 'shared' ? [] : [userId];
+  let sql = `SELECT id, fiscal_year, period FROM upload_history WHERE ${where}`;
+  if (fy != null) { sql += ' AND fiscal_year = ?'; params.push(fy); }
+  if (period) { sql += ' AND period = ?'; params.push(period); }
+  // Newest first: by fiscal_year, then most recent upload.
+  sql += ' ORDER BY fiscal_year DESC, uploaded_at DESC LIMIT 1';
+  return db.get(sql, params);
+}
+
+// GET /api/data?source=auto|personal|shared&fy=2025&period=annual
+// Without fy/period, returns the latest dataset for the scope (default view).
 data.get('/', async (c) => {
   const db = c.get('db');
   const userId = c.get('user').id;
   const source = c.req.query('source') || 'auto';
-  let uploadId = null;
+  const fy = c.req.query('fy') ? parseInt(c.req.query('fy'), 10) : null;
+  const period = c.req.query('period') || null;
+
+  let upload = null;
   let dataSource = 'sample';
 
   if (source === 'personal' || source === 'auto') {
-    const personal = await db.get('SELECT id FROM upload_history WHERE user_id = ? AND is_shared = 0 ORDER BY uploaded_at DESC LIMIT 1', [userId]);
-    if (personal) { uploadId = personal.id; dataSource = 'personal'; }
+    upload = await findUpload(db, { userId, scope: 'personal', fy, period });
+    if (upload) dataSource = 'personal';
   }
-  if (source === 'shared' || (source === 'auto' && !uploadId)) {
-    const shared = await db.get('SELECT id FROM upload_history WHERE is_shared = 1 ORDER BY uploaded_at DESC LIMIT 1');
-    if (shared) { uploadId = shared.id; dataSource = 'shared'; }
+  if (source === 'shared' || (source === 'auto' && !upload)) {
+    const shared = await findUpload(db, { userId, scope: 'shared', fy, period });
+    if (shared) { upload = shared; dataSource = 'shared'; }
   }
-  if (!uploadId) return c.json({ ok: true, source: 'sample', circuits: [] });
+  if (!upload) return c.json({ ok: true, source: 'sample', circuits: [], fiscalYear: fy, period });
 
-  const circuits = await db.all('SELECT * FROM circuit_data WHERE upload_id = ?', [uploadId]);
+  const circuits = await db.all('SELECT * FROM circuit_data WHERE upload_id = ?', [upload.id]);
   let fieldLabels = null;
   const labelCfg = await db.get('SELECT config_json FROM dashboard_config WHERE user_id = ? AND config_key = ?', [userId, 'field_labels']);
   if (labelCfg) { try { fieldLabels = JSON.parse(labelCfg.config_json); } catch {} }
-  return c.json({ ok: true, source: dataSource, circuits, fieldLabels });
+  return c.json({
+    ok: true,
+    source: dataSource,
+    fiscalYear: upload.fiscal_year,
+    period: upload.period,
+    circuits,
+    fieldLabels,
+  });
+});
+
+// GET /api/data/periods?source=auto|personal|shared
+// Lists the fiscal-year/period datasets available, newest first — drives the
+// period selector and the "compare to" picker for year-over-year charts.
+data.get('/periods', async (c) => {
+  const db = c.get('db');
+  const userId = c.get('user').id;
+  const source = c.req.query('source') || 'auto';
+
+  const scopes = source === 'shared' ? ['shared']
+    : source === 'personal' ? ['personal']
+    : ['personal', 'shared'];
+
+  const seen = new Set();
+  const periods = [];
+  for (const scope of scopes) {
+    const where = scope === 'shared' ? 'is_shared = 1' : 'user_id = ? AND is_shared = 0';
+    const params = scope === 'shared' ? [] : [userId];
+    const rows = await db.all(
+      `SELECT fiscal_year, period, MAX(uploaded_at) AS uploaded_at,
+              (SELECT COUNT(*) FROM circuit_data cd
+                 JOIN upload_history u2 ON cd.upload_id = u2.id
+                WHERE u2.fiscal_year IS uh.fiscal_year AND u2.period = uh.period AND ${where}) AS row_count
+         FROM upload_history uh
+        WHERE ${where} AND fiscal_year IS NOT NULL
+        GROUP BY fiscal_year, period
+        ORDER BY fiscal_year DESC, period`,
+      [...params, ...params]
+    );
+    for (const r of rows) {
+      const key = `${scope}:${r.fiscal_year}:${r.period}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      periods.push({ scope, fiscalYear: r.fiscal_year, period: r.period, label: `FY${String(r.fiscal_year).slice(-2)}${r.period === 'annual' ? '' : ' ' + r.period}` });
+    }
+  }
+  return c.json({ ok: true, periods });
 });
 
 // POST /api/data/preview-headers — multipart; stash bytes in KV, return headers
@@ -89,8 +159,11 @@ data.post('/preview-headers', async (c) => {
 
 // POST /api/data/upload-mapped — read KV bytes, parse with mapping, insert
 data.post('/upload-mapped', async (c) => {
-  const { tempFile, mapping, shared } = await c.req.json().catch(() => ({}));
+  const { tempFile, mapping, shared, fiscalYear, period } = await c.req.json().catch(() => ({}));
   if (!tempFile) return c.json({ ok: false, error: 'No temp file specified' }, 400);
+
+  const fy = fiscalYear != null && fiscalYear !== '' ? parseInt(fiscalYear, 10) : currentFiscalYear();
+  const per = period || 'annual';
 
   const isShared = shared === true || shared === 'true';
   if (isShared && c.get('user').role !== 'admin') {
@@ -108,10 +181,10 @@ data.post('/upload-mapped', async (c) => {
   if (!rows.length) return c.json({ ok: false, error: 'No circuit data found in file' }, 400);
 
   const db = c.get('db');
-  const uploadId = await persistUpload(db, { userId: c.get('user').id, filename, isShared, rows });
+  const uploadId = await persistUpload(db, { userId: c.get('user').id, filename, isShared, rows, fiscalYear: fy, period: per });
   await c.env.TEMP_UPLOADS.delete(key);
-  await audit(c, 'data.upload', { uploadId, filename, rowCount: rows.length, shared: isShared });
-  return c.json({ ok: true, uploadId, rowCount: rows.length, source: isShared ? 'shared' : 'personal' });
+  await audit(c, 'data.upload', { uploadId, filename, rowCount: rows.length, shared: isShared, fiscalYear: fy, period: per });
+  return c.json({ ok: true, uploadId, rowCount: rows.length, source: isShared ? 'shared' : 'personal', fiscalYear: fy, period: per });
 });
 
 // GET /api/data/uploads — history
