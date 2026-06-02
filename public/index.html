@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GPDC Dashboards</title>
+  
+  <!-- Fonts (GPDC Brand: Manrope + Ubuntu) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  
+  <!-- TopoJSON for map -->
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+  
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- SheetJS for Excel parsing -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  
+  <!-- html2canvas for dashboard export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Dashboard Styles -->
+  <link rel="stylesheet" href="/css/dashboard.css">
+
+  <style>
+    /* ── New three-zone header ── */
+    .header-nav {
+      display: flex;
+      background: var(--bg-light, #f5f3f0);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 2px;
+      border: 1px solid var(--border-light, #e5e2dd);
+    }
+    .nav-tab {
+      padding: 0.4rem 0.875rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      border: none;
+      background: transparent;
+      color: var(--text-light, #6b6b6b);
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Manrope', sans-serif;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      white-space: nowrap;
+    }
+    .nav-tab svg { opacity: 0.6; }
+    .nav-tab:hover { color: var(--primary); background: var(--primary-subtle, rgba(184,92,56,0.06)); }
+    .nav-tab:hover svg { opacity: 1; }
+    .nav-tab.active {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      box-shadow: 0 2px 8px rgba(184,92,56,0.3);
+    }
+    .nav-tab.active svg { opacity: 1; }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+
+    .header-action-btn {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      border: 1.5px solid var(--border-light, #e5e2dd);
+      background: var(--bg-white, white);
+      color: var(--text-dark, #1a1a1a);
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Manrope', sans-serif;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      white-space: nowrap;
+    }
+    .header-action-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-subtle, rgba(184,92,56,0.06));
+    }
+    .header-action-btn.upload.active-upload {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-subtle, rgba(184,92,56,0.06));
+    }
+
+    /* Dropdown system */
+    .header-dropdown-wrap {
+      position: relative;
+    }
+    .header-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: white;
+      border: 1px solid var(--border-light, #e5e2dd);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+      min-width: 200px;
+      z-index: 200;
+      padding: 0.375rem;
+      animation: dropdownIn 0.15s ease-out;
+    }
+    .header-dropdown.open { display: block; }
+    @keyframes dropdownIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .header-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      font-family: 'Manrope', sans-serif;
+      color: var(--text-dark, #1a1a1a);
+      border: none;
+      background: none;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      transition: background 0.15s;
+    }
+    .header-dropdown-item:hover { background: var(--bg-light, #f5f3f0); }
+    .header-dropdown-item.danger { color: #dc2626; }
+    .header-dropdown-item.danger:hover { background: #fef2f2; }
+    .header-dropdown-section {
+      padding: 0.5rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+    .header-dropdown-label {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-light, #6b6b6b);
+    }
+    .header-dropdown-divider {
+      height: 1px;
+      background: var(--border-light, #e5e2dd);
+      margin: 0.25rem 0.5rem;
+    }
+
+    /* User button */
+    .header-user-btn {
+      padding: 0.3rem 0.5rem 0.3rem 0.3rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      border: 1.5px solid var(--border-light, #e5e2dd);
+      background: var(--bg-white, white);
+      color: var(--text-dark, #1a1a1a);
+      border-radius: 50px;
+      cursor: pointer;
+      font-family: 'Manrope', sans-serif;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .header-user-btn:hover {
+      border-color: var(--primary);
+      background: var(--primary-subtle, rgba(184,92,56,0.06));
+    }
+    .header-user-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .header-user-name {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--gpdc-navy, #1a1a1a);
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .header-admin-badge {
+      font-size: 0.5rem;
+      font-weight: 700;
+      background: var(--primary);
+      color: white;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-left: auto;
+    }
+    .user-dropdown {
+      min-width: 220px;
+    }
+    .data-source-badge {
+      font-size: 0.625rem;
+      font-weight: 700;
+      padding: 0.125rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      display: inline-block;
+    }
+    .data-source-badge.sample { background: #fef3cd; color: #856404; }
+    .data-source-badge.shared { background: #d1e7dd; color: #0f5132; }
+    .data-source-badge.personal { background: #cfe2ff; color: #084298; }
+    .data-source-toggle {
+      font-size: 0.75rem;
+      font-family: 'Manrope', sans-serif;
+      border: 1px solid var(--gpdc-border, #e5e2dd);
+      border-radius: 6px;
+      padding: 0.25rem 0.5rem;
+      background: var(--bg-white, white);
+      cursor: pointer;
+      width: 100%;
+    }
+
+    /* Export bar */
+    .export-bar {
+      position: sticky;
+      top: 57px;
+      z-index: 99;
+      background: linear-gradient(135deg, #fdf6f2, #fff);
+      border-bottom: 1px solid var(--border-light, #e5e2dd);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .export-bar-inner {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .export-bar-label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-dark, #1a1a1a);
+      white-space: nowrap;
+    }
+    .export-bar-input {
+      flex: 1;
+      max-width: 300px;
+      padding: 0.375rem 0.625rem;
+      font-size: 0.8125rem;
+      font-family: 'Manrope', sans-serif;
+      border: 1px solid var(--border-light, #e5e2dd);
+      border-radius: 6px;
+      background: white;
+    }
+    .export-bar-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(184,92,56,0.12);
+    }
+    .export-bar-btn {
+      padding: 0.375rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'Manrope', sans-serif;
+      border: 1px solid var(--border-light, #e5e2dd);
+      background: white;
+      color: var(--text-dark, #1a1a1a);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .export-bar-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .export-bar-btn.primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white;
+      border-color: transparent;
+    }
+    .export-bar-btn.primary:hover { opacity: 0.9; }
+    .export-bar-btn.cancel { color: var(--text-light, #6b6b6b); }
+    .export-bar-btn.cancel:hover { color: #dc2626; border-color: #dc2626; }
+
+    /* Dashboard view header with customize button */
+    .dashboard-view-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0;
+    }
+    .customize-wrap {
+      position: relative;
+    }
+    .customize-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.375rem 0.625rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'Manrope', sans-serif;
+      color: var(--text-light, #6b6b6b);
+      background: none;
+      border: 1px solid var(--border-light, #e5e2dd);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .customize-btn:hover { color: var(--primary); border-color: var(--primary); }
+    .customize-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: white;
+      border: 1px solid var(--border-light, #e5e2dd);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      min-width: 220px;
+      z-index: 150;
+      padding: 0.5rem;
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .customize-menu.open { display: block; animation: dropdownIn 0.15s ease-out; }
+    .customize-menu-header {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dark, #1a1a1a);
+      padding: 0.375rem 0.5rem 0.5rem;
+      border-bottom: 1px solid var(--border-light, #e5e2dd);
+      margin-bottom: 0.25rem;
+    }
+    .customize-group-label {
+      font-size: 0.625rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--primary);
+      padding: 0.5rem 0.5rem 0.25rem;
+    }
+    .customize-menu label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.8125rem;
+      font-family: 'Manrope', sans-serif;
+      color: var(--text-dark, #1a1a1a);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .customize-menu label:hover { background: var(--bg-light, #f5f3f0); }
+    .customize-menu input[type="checkbox"] {
+      accent-color: var(--primary);
+      width: 14px;
+      height: 14px;
+    }
+    .customize-menu-footer {
+      padding: 0.375rem 0.5rem;
+      border-top: 1px solid var(--border-light, #e5e2dd);
+      margin-top: 0.25rem;
+    }
+    .customize-reset-btn {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      font-family: 'Manrope', sans-serif;
+      color: var(--primary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    .customize-reset-btn:hover { text-decoration: underline; }
+
+    /* Column mapping styles */
+    .mapping-area { display: none; margin-top: 1.5rem; }
+    .mapping-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      color: var(--gpdc-navy);
+      margin-bottom: 0.25rem;
+    }
+    .mapping-subtitle {
+      font-size: 0.8125rem;
+      color: #6b7280;
+      margin-bottom: 1rem;
+    }
+    .mapping-grid {
+      display: grid;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .mapping-row {
+      display: grid;
+      grid-template-columns: 1fr 200px 40px;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .mapping-row-header {
+      margin-bottom: 0.25rem;
+    }
+    .mapping-col-header {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #9ca3af;
+    }
+    .mapping-excel-col {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--gpdc-navy);
+      padding: 0.375rem 0.625rem;
+      background: var(--gpdc-bg);
+      border-radius: 6px;
+      border: 1px solid var(--gpdc-border);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .mapping-label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--gpdc-navy);
+    }
+    .mapping-required { color: #dc2626; }
+    .mapping-select {
+      padding: 0.375rem 0.5rem;
+      font-size: 0.8125rem;
+      font-family: 'Manrope', sans-serif;
+      border: 1px solid var(--gpdc-border);
+      border-radius: 6px;
+      background: var(--bg-white);
+      width: 100%;
+    }
+    .mapping-select option:disabled {
+      color: #d1d5db;
+    }
+    .mapping-auto {
+      font-size: 0.625rem;
+      color: #16a34a;
+      font-weight: 700;
+      text-align: center;
+    }
+    .mapping-auto-placeholder {
+      display: block;
+      width: 40px;
+    }
+    .mapping-actions { margin-top: 1rem; }
+    .mapping-shared-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8125rem;
+      margin-bottom: 0.75rem;
+    }
+    .mapping-btn-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .mapping-upload-btn {
+      background: var(--primary) !important;
+      color: white !important;
+    }
+    .mapping-cancel-btn {
+      background: var(--gpdc-bg) !important;
+      color: var(--gpdc-navy) !important;
+      border: 1px solid var(--gpdc-border) !important;
+    }
+
+    /* Template download link */
+    .upload-template-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      margin-top: 0.75rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      font-family: 'Manrope', sans-serif;
+      color: var(--primary);
+      background: rgba(184, 92, 56, 0.06);
+      border: 1px solid rgba(184, 92, 56, 0.2);
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .upload-template-link:hover {
+      background: rgba(184, 92, 56, 0.12);
+      border-color: var(--primary);
+    }
+
+    /* Clear Data Section */
+    .clear-data-section {
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+    .clear-data-divider {
+      height: 1px;
+      background: var(--gpdc-border);
+      margin-bottom: 1rem;
+    }
+    .clear-data-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5rem 1rem;
+      background: none;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      color: #dc2626;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      font-family: 'Manrope', sans-serif;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .clear-data-btn:hover {
+      background: #fef2f2;
+      border-color: #ef4444;
+    }
+    .clear-data-hint {
+      font-size: 0.6875rem;
+      color: #9ca3af;
+      margin-top: 0.375rem;
+    }
+
+    /* Welcome Hero (shown when no data uploaded) */
+    .welcome-hero {
+      display: none;
+      min-height: 65vh;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 3rem 2rem;
+      animation: fadeInUp 0.6s ease-out both;
+    }
+    .welcome-hero.visible { display: flex; }
+
+    .welcome-hero-icon {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, rgba(184,92,56,0.08), rgba(184,92,56,0.15));
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.75rem;
+    }
+    .welcome-hero-icon svg {
+      width: 40px;
+      height: 40px;
+      stroke: var(--primary);
+    }
+
+    .welcome-hero h1 {
+      font-family: 'Ubuntu', sans-serif;
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--gpdc-navy);
+      margin: 0 0 0.75rem;
+      letter-spacing: -0.02em;
+    }
+    .welcome-hero-subtitle {
+      font-size: 1rem;
+      color: #6b7280;
+      line-height: 1.7;
+      max-width: 520px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .welcome-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      max-width: 700px;
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    @media (max-width: 640px) {
+      .welcome-actions-grid { grid-template-columns: 1fr; max-width: 320px; }
+    }
+
+    .welcome-action-card {
+      background: white;
+      border: 1.5px solid var(--border-light);
+      border-radius: 16px;
+      padding: 1.75rem 1.25rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      font-family: 'Manrope', sans-serif;
+      transition: all 0.2s;
+      box-shadow: var(--shadow-sm);
+    }
+    .welcome-action-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 6px 24px rgba(184,92,56,0.10);
+      transform: translateY(-3px);
+    }
+    .welcome-action-card:active {
+      transform: translateY(-1px);
+    }
+
+    .welcome-action-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+    .welcome-action-icon svg { width: 24px; height: 24px; }
+    .welcome-action-icon.upload { background: linear-gradient(135deg, rgba(184,92,56,0.08), rgba(184,92,56,0.15)); color: var(--primary); }
+    .welcome-action-icon.template { background: linear-gradient(135deg, rgba(45,138,86,0.08), rgba(45,138,86,0.15)); color: #2d8a56; }
+    .welcome-action-icon.build { background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(59,130,246,0.15)); color: #3b82f6; }
+
+    .welcome-action-label {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--gpdc-navy, #1a1a1a);
+      margin-bottom: 0.375rem;
+    }
+    .welcome-action-desc {
+      font-size: 0.75rem;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    .welcome-helper-text {
+      font-size: 0.75rem;
+      color: var(--text-light);
+      margin-top: 0;
+      line-height: 1.5;
+    }
+    .welcome-template-link {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      margin-left: 0.25rem;
+    }
+    .welcome-template-link:hover {
+      text-decoration: underline;
+    }
+
+    /* ── Home Button ── */
+    .header-home-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border: 1.5px solid var(--border-light, #eae7e3);
+      border-radius: 10px;
+      background: var(--bg-white, white);
+      cursor: pointer;
+      color: var(--text-light, #8a8a8a);
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .header-home-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-subtle, rgba(184,92,56,0.06));
+    }
+
+    /* ── Persistent Dashboard Bar ── */
+    .dashboard-bar {
+      position: sticky;
+      top: 57px;
+      z-index: 98;
+      background: var(--bg-white, #fff);
+      border-bottom: 1px solid var(--border-light, #eae7e3);
+    }
+    .dashboard-bar-inner {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      position: relative;
+    }
+    .dashboard-bar-name {
+      font-family: 'Ubuntu', sans-serif;
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--text-dark, #1a1a1a);
+      border: none;
+      background: transparent;
+      outline: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 8px;
+      transition: all 0.2s;
+      max-width: 320px;
+    }
+    .dashboard-bar-name:hover {
+      background: rgba(0,0,0,0.02);
+    }
+    .dashboard-bar-name:focus {
+      background: var(--bg-white, white);
+      box-shadow: 0 0 0 2px var(--primary-light, #D4775A);
+    }
+    .dashboard-bar-switcher {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--border-light, #eae7e3);
+      border-radius: 8px;
+      background: var(--bg-white, white);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-light, #8a8a8a);
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .dashboard-bar-switcher:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    .dashboard-bar-template-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: 'Manrope', sans-serif;
+      color: var(--text-light, #8a8a8a);
+      background: none;
+      border: 1px solid var(--border-light, #eae7e3);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      margin-left: auto;
+    }
+    .dashboard-bar-template-btn:hover {
+      color: var(--primary);
+      border-color: var(--primary);
+      background: var(--primary-subtle, rgba(184,92,56,0.06));
+    }
+
+    /* Hide dashboard content when no data */
+    #dashboardContent.hidden { display: none !important; }
+
+    /* Header responsive */
+    @media (max-width: 1100px) {
+      .nav-tab span { display: none; }
+      .header-user-name { display: none; }
+    }
+    @media (max-width: 900px) {
+      .header-inner {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+      }
+      .header-nav { justify-content: center; }
+      .header-actions { justify-content: flex-end; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <!-- Left: Brand -->
+      <a class="brand" href="#" id="brandHomeLink">
+        <img class="brand-logo" src="https://cdn.prod.website-files.com/66c9595206b0d169d1677e69/66e9df4a3e925a89e1be2971_BlackGold%20-%20SYMBOL%20MARK.png" alt="GPDC Logo">
+        <div class="brand-text">
+          <div class="brand-subtitle">GEORGIA PUBLIC DEFENDER COUNCIL</div>
+          <div class="brand-title">Dashboards</div>
+        </div>
+      </a>
+
+      <!-- Home Button -->
+      <button class="header-home-btn" id="headerHomeBtn" title="Home">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </button>
+
+      <!-- Center: Nav Tabs -->
+      <nav class="header-nav">
+        <button id="tabDashboard" class="nav-tab active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </button>
+        <button id="tabCircuits" class="nav-tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Circuits
+        </button>
+        <button id="tabMap" class="nav-tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+          Map
+        </button>
+      </nav>
+
+      <!-- Right: Actions -->
+      <div class="header-actions">
+        <!-- Export Dropdown -->
+        <div class="header-dropdown-wrap" id="exportDropdownWrap">
+          <button class="header-action-btn" id="exportDropdownBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="header-dropdown" id="exportDropdown">
+            <button class="header-dropdown-item" id="exportPngBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Export as PNG
+            </button>
+            <button class="header-dropdown-item" id="exportPdfBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Export as PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Upload Button -->
+        <button id="tabUpload" class="header-action-btn upload">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload
+        </button>
+
+        <!-- User Dropdown -->
+        <div class="header-dropdown-wrap" id="userDropdownWrap">
+          <button class="header-user-btn" id="userDropdownBtn">
+            <div class="header-user-avatar" id="headerUserAvatar">?</div>
+            <span class="header-user-name" id="headerUserName"></span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="header-dropdown user-dropdown" id="userDropdown">
+            <div class="header-dropdown-section">
+              <div class="header-dropdown-label">Data Source</div>
+              <span class="data-source-badge sample" id="dataSourceBadge">No Data</span>
+              <select class="data-source-toggle" id="dataSourceToggle">
+                <option value="auto">Auto</option>
+                <option value="shared">Shared Data</option>
+                <option value="personal">My Data</option>
+              </select>
+            </div>
+            <div class="header-dropdown-divider"></div>
+            <button class="header-dropdown-item" id="manageUsersBtn" style="display:none;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Manage Team
+              <span class="header-admin-badge" id="headerAdminBadge">Admin</span>
+            </button>
+            <button class="header-dropdown-item danger" id="clearDataBtnHeader" style="display:none;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Clear Data
+            </button>
+            <div class="header-dropdown-divider"></div>
+            <button class="header-dropdown-item" id="logoutBtn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Persistent Dashboard Selector Bar -->
+  <div class="dashboard-bar" id="dashboardBar">
+    <div class="dashboard-bar-inner">
+      <input class="dashboard-bar-name" id="dashboardName" value="My Dashboard" placeholder="Dashboard name">
+      <button class="dashboard-bar-switcher" id="dashboardSwitcherBtn" title="Switch dashboards">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="dashboard-switcher-dropdown" id="dashboardSwitcherDropdown">
+        <div id="dashboardSwitcherList"></div>
+        <button class="dashboard-switcher-new" id="dashboardNewBtn">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Dashboard
+        </button>
+      </div>
+      <button class="dashboard-bar-template-btn" id="dashboardTemplateDlBtn" title="Download an Excel template matching this dashboard's fields">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Template
+      </button>
+    </div>
+  </div>
+
+  <!-- Export Bar (shown when export is triggered) -->
+  <div class="export-bar" id="exportBar" style="display:none;">
+    <div class="export-bar-inner">
+      <label class="export-bar-label">Title:</label>
+      <input type="text" class="export-bar-input" id="exportTitle" placeholder="Dashboard Export">
+      <button class="export-bar-btn primary" id="exportBarPng">PNG</button>
+      <button class="export-bar-btn" id="exportBarPdf">PDF</button>
+      <button class="export-bar-btn cancel" id="exportBarCancel">Cancel</button>
+    </div>
+  </div>
+
+  <main class="main">
+    <!-- Upload Data Panel (shown when Upload Data tab clicked) -->
+    <div id="viewUpload" class="upload-view">
+      <div class="upload-panel">
+        <div class="upload-panel-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+        <div class="upload-panel-title">Upload Your Data</div>
+        <div class="upload-panel-subtitle">Any Excel file with a "Circuit" column works. You'll map your columns after selecting the file.</div>
+        <div class="upload-panel-actions">
+          <input type="file" id="fileInput" accept=".xlsx,.xls" />
+          <button class="upload-btn" id="uploadBtn">Choose File</button>
+        </div>
+        <span class="upload-status" id="uploadStatus">Data loaded successfully</span>
+        <div class="upload-panel-hint">Accepts .xlsx and .xls files</div>
+        <a href="/api/data/template" download class="upload-template-link" id="downloadTemplateBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Template
+        </a>
+        <div class="mapping-area" id="uploadMappingArea"></div>
+
+        <!-- Clear Data (shown only when data exists) -->
+        <div id="clearDataSection" class="clear-data-section" style="display: none;">
+          <div class="clear-data-divider"></div>
+          <button class="clear-data-btn" id="clearDataBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Clear Uploaded Data
+          </button>
+          <div class="clear-data-hint">Remove all uploaded data and return to the empty dashboard</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="viewDashboard" class="dashboard-view">
+
+      <!-- Welcome Hero (shown when no data uploaded) -->
+      <div class="welcome-hero" id="emptyStateBanner">
+        <div class="welcome-hero-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <h1>Welcome to Dashboards</h1>
+        <div class="welcome-hero-subtitle">
+          Build visual reports for your circuit data. Upload an Excel file, pick a template, or start from scratch.
+        </div>
+
+        <div class="welcome-actions-grid">
+          <button class="welcome-action-card" id="emptyStateUploadBtn">
+            <div class="welcome-action-icon upload">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="welcome-action-label">Upload Your Data</div>
+            <div class="welcome-action-desc">Import an Excel file and map your columns</div>
+          </button>
+          <button class="welcome-action-card" id="emptyStateTemplateBtn">
+            <div class="welcome-action-icon template">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            </div>
+            <div class="welcome-action-label">Choose a Template</div>
+            <div class="welcome-action-desc">Pre-built layouts for Caseload, HR, Finance, and more</div>
+          </button>
+          <button class="welcome-action-card" id="emptyStateBuildBtn">
+            <div class="welcome-action-icon build">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            </div>
+            <div class="welcome-action-label">Build from Scratch</div>
+            <div class="welcome-action-desc">Start empty and add cards as you go</div>
+          </button>
+        </div>
+
+        <div class="welcome-helper-text">
+          Need the right format?
+          <a href="#" class="welcome-template-link" id="welcomeTemplateLink">Download Excel template</a>
+        </div>
+      </div>
+
+      <!-- Dashboard Content (hidden until data is uploaded) -->
+      <div id="dashboardContent" class="hidden">
+
+      <!-- Unified Cards Grid (KPIs + Charts rendered dynamically by chart-engine.js) -->
+      <div class="dashboard-charts-section" id="dashboardChartsSection"></div>
+      </div><!-- end #dashboardContent -->
+    </div>
+
+    <!-- Circuit Breakdown View -->
+    <div id="viewCircuits" class="circuits-view">
+      <div class="circuits-view-header">
+        <div class="circuits-view-title">Circuit Breakdown</div>
+        <button id="resetBtn" class="reset-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 2v6h6"/><path d="M2.64 11.36A9 9 0 1 0 4.36 5.64L2.5 8"/></svg> Reset Filters</button>
+      </div>
+
+      <div class="dashboard-layout">
+        <div class="sidebar">
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Filters</span>
+              <span class="active-pill" id="activeFilterPill">Active</span>
+            </div>
+            <div class="panel-body">
+              <div class="filter-group">
+                <label class="filter-label">Circuit</label>
+                <select id="circuitSelect" class="filter-select"></select>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">County</label>
+                <select id="countySelect" class="filter-select"></select>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Search</label>
+                <input id="searchInput" type="search" class="filter-search" placeholder="Search circuits or counties…" />
+              </div>
+              <div class="filter-info">
+                Case and staffing data. No client-identifying information.
+                <div class="legend-section">
+                  <div class="legend-title">Attorney Types</div>
+                  <div class="legend-items">
+                    <span class="legend-item"><span class="attorney-badge state">S</span> State (GPDC)</span>
+                    <span class="legend-item"><span class="attorney-badge county">C</span> County (non-GPDC)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Circuits</span>
+              <span class="panel-badge" id="circuitCount">—</span>
+            </div>
+            <div class="circuit-list" id="circuitList"></div>
+          </div>
+        </div>
+
+        <div class="main-content">
+          <div id="normalTable" class="panel">
+            <div class="panel-header">
+              <div>
+                <span class="panel-title">Circuit Overview</span>
+                <div class="table-meta" id="tableMeta">Click a row to filter</div>
+              </div>
+              <div class="table-toolbar">
+                <div class="col-toggle-wrap" id="colToggleWrap">
+                  <button class="table-toolbar-btn" id="colToggleBtn" type="button">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    Columns
+                  </button>
+                  <div class="col-toggle-menu" id="colToggleMenu">
+                    <div class="col-toggle-header">Show / Hide Columns</div>
+                    <label><input type="checkbox" data-col="1" checked> Total Cases</label>
+                    <label><input type="checkbox" data-col="2" checked> Conflict Cases</label>
+                    <label><input type="checkbox" data-col="3" checked> State Attorneys</label>
+                    <label><input type="checkbox" data-col="4" checked> County Attorneys</label>
+                    <label><input type="checkbox" data-col="5" checked> Total Attorneys</label>
+                    <label><input type="checkbox" data-col="6" checked> State Caseload</label>
+                  </div>
+                </div>
+                <button class="table-toolbar-btn" id="tableExportPng" type="button">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  PNG
+                </button>
+                <button class="table-toolbar-btn" id="tableExportPdf" type="button">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  PDF
+                </button>
+              </div>
+            </div>
+            <div class="table-disclaimer" id="tableDisclaimer">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e6a23c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <div>Georgia's <strong>hybrid defender system</strong> separates attorney staffing between the state and the circuit counties. Counties individually fund attorney positions in varying numbers. The Central Office is unable to access each county's employees and budget data — <strong>some county attorney numbers are incomplete</strong>. An asterisk (<strong>*</strong>) indicates incomplete county data for that circuit.</div>
+            </div>
+            <div class="table-container">
+              <table class="circuit-table">
+                <thead>
+                  <tr>
+                    <th>Circuit</th>
+                    <th class="text-right">Total Cases</th>
+                    <th class="text-right">Conflict Cases</th>
+                    <th class="text-right">State Atty <span class="attorney-badge state" style="vertical-align: middle;">S</span></th>
+                    <th class="text-right">County Atty <span class="attorney-badge county" style="vertical-align: middle;">C</span></th>
+                    <th class="text-right">Total Atty</th>
+                    <th class="text-right">State Caseload</th>
+                  </tr>
+                </thead>
+                <tbody id="circuitTableBody"></tbody>
+              </table>
+            </div>
+            <div style="padding: 0.625rem 0.875rem; font-size: 0.625rem; color: var(--gpdc-slate-light); border-top: 1px solid var(--gpdc-border); line-height: 1.5;">
+              * <strong>State Caseload</strong> is calculated using GPDC State Attorneys only. <strong>*</strong> in County Atty column indicates incomplete county data — information is still being collected from county partners.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="viewMap" class="map-view">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="map-header" style="width: 100%;">
+            <div>
+              <span class="panel-title">Georgia Counties by Circuit</span>
+              <div class="table-meta">Click a county to filter</div>
+            </div>
+            <div class="map-controls">
+              <label class="filter-label" style="margin: 0;">Data:</label>
+              <select id="mapDataSelect" class="map-select">
+                <option value="normal">Circuit Office</option>
+                <option value="conflict">Conflict</option>
+              </select>
+              <label class="filter-label" style="margin: 0;">Metric:</label>
+              <select id="mapMetricSelect" class="map-select">
+                <option value="NEW">New Cases</option>
+                <option value="TOTAL">Total Cases</option>
+                <option value="TOTAL_ATTY">Total Attorneys</option>
+                <option value="STATE_ATTY">State Attorneys</option>
+                <option value="COUNTY_ATTY">County Attorneys</option>
+                <option value="CASELOAD">Caseload</option>
+              </select>
+              <button id="mapResetBtn" class="map-btn">Clear Filter</button>
+            </div>
+          </div>
+        </div>
+        <div id="map"></div>
+      </div>
+    </div>
+
+    <footer class="footer">GPDC Dashboards • Data for planning and reporting purposes only</footer>
+  </main>
+
+  <!-- Card Editor Modal -->
+  <div id="cardEditorOverlay" class="card-editor-overlay"></div>
+  <div id="cardEditorPanel" class="card-editor-modal">
+    <div class="card-editor-modal-inner">
+      <div class="card-editor-header">
+        <h3 id="cardEditorTitle">Edit Card</h3>
+        <button id="cardEditorClose" class="card-editor-close">&times;</button>
+      </div>
+      <div class="card-editor-preview" id="cardEditorPreview"></div>
+      <div class="card-editor-body" id="cardEditorBody"></div>
+      <div class="card-editor-footer">
+        <button class="card-editor-cancel-btn" id="cardEditorCancelBtn">Cancel</button>
+        <button class="card-editor-done-btn" id="cardEditorDoneBtn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Onboarding / Suggested Cards Modal -->
+  <div class="onboarding-modal" id="onboardingModal">
+    <div class="onboarding-content" id="onboardingContent"></div>
+  </div>
+
+  <!-- Dashboard JavaScript (load order matters) -->
+  <script src="/js/data.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script src="/js/chart-engine.js"></script>
+  <script src="/js/upload.js"></script>
+  <script src="/js/reports.js"></script>
+  <script src="/js/table-export.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

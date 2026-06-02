@@ -1,0 +1,87 @@
+{
+  "name": "gpdc-dashboard",
+  "version": "1.0.0",
+  "description": "GPDC Statewide Dashboard",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:web": "NODE_ENV=production node server.js",
+    "start:electron": "electron .",
+    "seed": "node db/seed.js",
+    "seed:pg": "GPDC_DB_DRIVER=postgres node db/seed.js",
+    "postinstall": "electron-builder install-app-deps",
+    "dist": "electron-builder --mac",
+    "dist:dir": "electron-builder --mac dir"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "multer": "^2.0.2",
+    "xlsx": "^0.18.5"
+  },
+  "optionalDependencies": {
+    "pg": "^8.13.1",
+    "connect-pg-simple": "^10.0.0"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.gpdc.dashboard",
+    "productName": "GPDC Dashboard",
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "GPDC Dashboard",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "files": [
+      "server.js",
+      ".env",
+      "routes/**/*",
+      "middleware/**/*",
+      "lib/**/*",
+      "public/**/*",
+      "db/schema.sql",
+      "db/seed.js",
+      "electron/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+name = "gpdc-dashboard"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+# SheetJS reaches for Buffer; nodejs_compat provides it (proven in the POC).
+compatibility_flags = ["nodejs_compat"]
+
+# Serve the existing frontend (public/) as static assets. The Worker handles
+# /api/* and falls through to assets for everything else.
+[assets]
+directory = "../public"
+binding = "ASSETS"
+
+# Central database (Cloudflare D1).
+[[d1_databases]]
+binding = "DB"
+database_name = "gpdc_dashboard"
+# Replace with the real id from `wrangler d1 create gpdc_dashboard` before deploy.
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# Short-lived storage for the two-step upload (preview-headers -> upload-mapped).
+[[kv_namespaces]]
+binding = "TEMP_UPLOADS"
+id = "00000000000000000000000000000000"
+
+[vars]
+# Comma-separated emails granted the 'admin' role. In production these are the
+# same identities you'd put in the Cloudflare Access policy as admins.
+# 'dev@local' is the fallback identity used in local `wrangler dev` (no Access).
+ADMIN_EMAILS = "dev@local"
