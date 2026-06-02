@@ -67,6 +67,8 @@ function fieldLabel(key) {
 
 // Start with empty metrics — data comes from the server after upload
 let CIRCUIT_METRICS = new Map();
+// Comparison period (prior fiscal year) for year-over-year, loaded on demand.
+let CIRCUIT_METRICS_PRIOR = new Map();
 let __hasData = false;
 
 function emptyMetrics() {

@@ -88,15 +88,42 @@ const DASHBOARD_TEMPLATES = [
   }
 ];
 
+// Current data-source intent (from the toggle), defaulting to auto.
+function currentSource() {
+  const t = $('dataSourceToggle');
+  return (t && t.value) || 'auto';
+}
+
+// Map a server circuit row to the in-app metrics shape.
+function circuitRowToMetrics(row) {
+  return {
+    totalCases: row.total_cases || 0,
+    newCases: row.new_cases || 0,
+    closed: row.closed_cases || 0,
+    stateFilled: row.state_attorneys_filled || 0,
+    stateVacant: row.state_attorneys_vacant || 0,
+    countyAttorneys: row.county_attorneys || 0,
+    conflict: {
+      newCases: row.conflict_new_cases || 0,
+      rolloverCases: row.conflict_rollover_cases || 0,
+      totalContractors: row.total_contractors || 0,
+    },
+  };
+}
+
 async function loadDataFromAPI(source) {
   try {
-    const url = source ? `/api/data?source=${source}` : '/api/data';
+    const src = source || currentSource();
+    const fyParam = window.__currentFY ? `&fy=${window.__currentFY}` : '';
+    const url = `/api/data?source=${src}${fyParam}`;
     const res = await fetch(url);
     const data = await res.json();
 
     if (!data.ok) return;
 
     window.__dataSource = data.source;
+    // Pin the current fiscal year from the response (first load / latest).
+    if (!window.__currentFY && data.fiscalYear) window.__currentFY = data.fiscalYear;
 
     // Apply custom field labels if provided
     if (data.fieldLabels) {
@@ -119,19 +146,7 @@ async function loadDataFromAPI(source) {
     } else {
       const newMetrics = new Map();
       data.circuits.forEach(row => {
-        newMetrics.set(row.circuit, {
-          totalCases: row.total_cases || 0,
-          newCases: row.new_cases || 0,
-          closed: row.closed_cases || 0,
-          stateFilled: row.state_attorneys_filled || 0,
-          stateVacant: row.state_attorneys_vacant || 0,
-          countyAttorneys: row.county_attorneys || 0,
-          conflict: {
-            newCases: row.conflict_new_cases || 0,
-            rolloverCases: row.conflict_rollover_cases || 0,
-            totalContractors: row.total_contractors || 0
-          }
-        });
+        newMetrics.set(row.circuit, circuitRowToMetrics(row));
       });
 
       CIRCUITS.forEach(c => {
@@ -154,12 +169,80 @@ async function loadDataFromAPI(source) {
     }
 
     rerender();
+
+    // Year-over-year: load the comparison period (if any) and render the strip.
+    await refreshComparison(src);
+    if (typeof renderYoY === 'function') renderYoY();
   } catch (err) {
     console.error('Failed to load data:', err);
     initEmptyMetrics();
     updateDataSourceBadge('none');
     showEmptyState(true);
     rerender();
+  }
+}
+
+// Load the comparison (prior fiscal year) dataset into CIRCUIT_METRICS_PRIOR.
+async function refreshComparison(source) {
+  CIRCUIT_METRICS_PRIOR = new Map();
+  if (!window.__compareFY) return;
+  try {
+    const src = source || currentSource();
+    const res = await fetch(`/api/data?source=${src}&fy=${window.__compareFY}`);
+    const data = await res.json();
+    if (data.ok && data.circuits && data.circuits.length) {
+      const m = new Map();
+      data.circuits.forEach(row => m.set(row.circuit, circuitRowToMetrics(row)));
+      CIRCUIT_METRICS_PRIOR = m;
+    }
+  } catch (err) {
+    console.error('Failed to load comparison period:', err);
+  }
+}
+
+// Populate the period + compare selectors from available fiscal years.
+async function loadPeriods() {
+  const periodSel = $('periodSelect');
+  const compareSel = $('compareSelect');
+  const ctl = $('periodControls');
+  if (!periodSel || !compareSel) return;
+  try {
+    const res = await fetch(`/api/data/periods?source=${currentSource()}`);
+    const data = await res.json();
+    const all = (data.ok && data.periods) ? data.periods : [];
+    // Annual periods only, de-duped by fiscal year, newest first.
+    const seen = new Set();
+    const years = [];
+    all.forEach(p => {
+      if (p.period === 'annual' && p.fiscalYear != null && !seen.has(p.fiscalYear)) {
+        seen.add(p.fiscalYear);
+        years.push(p);
+      }
+    });
+
+    if (years.length === 0) { ctl.style.display = 'none'; return; }
+    ctl.style.display = 'flex';
+
+    if (!window.__currentFY) window.__currentFY = years[0].fiscalYear;
+    // Comparison can't equal the current year.
+    if (window.__compareFY === window.__currentFY) window.__compareFY = null;
+    // Default the comparison to the immediately prior year, if present.
+    if (window.__compareFY == null) {
+      const prior = years.find(p => p.fiscalYear === window.__currentFY - 1);
+      if (prior) window.__compareFY = prior.fiscalYear;
+    }
+
+    periodSel.innerHTML = years
+      .map(p => `<option value="${p.fiscalYear}" ${p.fiscalYear === window.__currentFY ? 'selected' : ''}>${p.label}</option>`)
+      .join('');
+    compareSel.innerHTML = ['<option value="">No comparison</option>']
+      .concat(years
+        .filter(p => p.fiscalYear !== window.__currentFY)
+        .map(p => `<option value="${p.fiscalYear}" ${p.fiscalYear === window.__compareFY ? 'selected' : ''}>${p.label}</option>`))
+      .join('');
+  } catch (err) {
+    console.error('Failed to load periods:', err);
+    if (ctl) ctl.style.display = 'none';
   }
 }
 
@@ -255,8 +338,13 @@ async function initApp() {
     return;
   }
 
-  // 2. Load data from API
+  // 2. Load data from API (latest period)
   await loadDataFromAPI();
+
+  // 2a. Populate period/compare selectors, then reload so the YoY strip fills
+  // (the first load ran before we knew which years exist).
+  await loadPeriods();
+  if (window.__compareFY) await loadDataFromAPI();
 
   // 2b. Load dashboards (uses /api/dashboards now)
   await chartEngine.loadDashboards();
@@ -409,7 +497,31 @@ async function initApp() {
   // 7. Data source toggle
   const sourceToggle = $('dataSourceToggle');
   if (sourceToggle) {
-    sourceToggle.addEventListener('change', (e) => loadDataFromAPI(e.target.value));
+    sourceToggle.addEventListener('change', async (e) => {
+      window.__currentFY = null;       // re-resolve latest for the new source
+      window.__compareFY = null;
+      await loadDataFromAPI(e.target.value);
+      await loadPeriods();
+      if (window.__compareFY) await loadDataFromAPI(e.target.value);
+    });
+  }
+
+  // 7a. Period + comparison selectors (year-over-year)
+  const periodSel = $('periodSelect');
+  if (periodSel) {
+    periodSel.addEventListener('change', async (e) => {
+      window.__currentFY = parseInt(e.target.value, 10) || null;
+      if (window.__compareFY === window.__currentFY) window.__compareFY = null;
+      await loadPeriods();
+      await loadDataFromAPI();
+    });
+  }
+  const compareSel = $('compareSelect');
+  if (compareSel) {
+    compareSel.addEventListener('change', async (e) => {
+      window.__compareFY = e.target.value ? parseInt(e.target.value, 10) : null;
+      await loadDataFromAPI();
+    });
   }
 
   // 8. Header dropdowns
