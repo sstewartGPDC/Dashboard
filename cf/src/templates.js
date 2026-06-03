@@ -133,3 +133,25 @@ export function buildDashboardTemplate(fieldKeys) {
   XLSX.utils.book_append_sheet(wb, ws, 'Circuit Data');
   return toBytes(wb);
 }
+
+// Field key → spreadsheet column label (mirrors the parser's primary aliases).
+const FIELD_LABEL = {
+  total_cases: 'Total Cases', new_cases: 'New Cases', rollover_cases: 'Rollover Cases', closed_cases: 'Closed Cases',
+  state_attorneys_filled: 'State Attorneys (Filled)', state_attorneys_vacant: 'State Attorneys (Vacant)', county_attorneys: 'County Attorneys',
+  conflict_new_cases: 'New Conflict Cases', conflict_rollover_cases: 'Rollover Conflict Cases', total_contractors: 'Total Contractors',
+  capital_cases: 'Capital Cases', felony_cases: 'Felony Cases', misdemeanor_cases: 'Misdemeanor Cases', juvenile_cases: 'Juvenile Cases', appeals_cases: 'Appeals', probation_cases: 'Probation Cases',
+  investigators: 'Investigators', social_workers: 'Social Workers', paralegals: 'Paralegals', annual_budget: 'Annual Budget', actual_spend: 'Actual Spend',
+};
+
+// Build a template Excel for a specific set of metric fields (a collection
+// template): Circuit column + the chosen fields + all 45 circuits pre-listed.
+export function buildFieldsTemplate(fields) {
+  const cols = ['Circuit', ...fields.map((f) => FIELD_LABEL[f]).filter(Boolean)];
+  const dataRows = [cols];
+  CIRCUITS.forEach((c) => dataRows.push([c, ...Array(cols.length - 1).fill('')]));
+  const ws = XLSX.utils.aoa_to_sheet(dataRows);
+  ws['!cols'] = cols.map((c) => ({ wch: Math.max(c.length + 3, 12) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Circuit Data');
+  return toBytes(wb);
+}

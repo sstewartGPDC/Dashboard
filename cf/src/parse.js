@@ -65,9 +65,17 @@ export function parseExcelBytes(bytes, customMapping = {}) {
   const sheet = workbook.Sheets[sheetName];
   const jsonRows = XLSX.utils.sheet_to_json(sheet);
 
-  if (!jsonRows.length) return { rows: [], headers: [], sheetName };
+  if (!jsonRows.length) return { rows: [], headers: [], sheetName, presentFields: [] };
 
   const headers = Object.keys(jsonRows[0]);
+  // Which metric fields actually have a column in this file — so a partial
+  // upload (e.g. budget only) merges just those fields, not everything.
+  const presentFields = Object.keys(DEFAULT_MAPPINGS).filter((field) => {
+    if (field === 'circuit') return false;
+    const custom = customMapping[field];
+    if (custom && headers.includes(custom)) return true;
+    return (DEFAULT_MAPPINGS[field] || []).some((alias) => headers.includes(alias));
+  });
   const rows = [];
 
   for (const row of jsonRows) {
@@ -118,7 +126,7 @@ export function parseExcelBytes(bytes, customMapping = {}) {
     });
   }
 
-  return { rows, headers, sheetName };
+  return { rows, headers, sheetName, presentFields };
 }
 
 /** Headers only — for the column-mapping preview step. */

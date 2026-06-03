@@ -35,25 +35,53 @@ function currentFiscalYear() {
   return now.getMonth() >= 6 ? now.getFullYear() + 1 : now.getFullYear();
 }
 
-async function persistUpload(db, { userId, filename, isShared, rows, fiscalYear, period }) {
-  const up = await db.run(
+// All upsertable metric columns on circuit_data.
+const CIRCUIT_FIELDS = [
+  'total_cases', 'new_cases', 'rollover_cases', 'closed_cases',
+  'state_attorneys_filled', 'state_attorneys_vacant', 'county_attorneys',
+  'conflict_new_cases', 'conflict_rollover_cases', 'total_contractors',
+  'capital_cases', 'felony_cases', 'misdemeanor_cases', 'juvenile_cases', 'appeals_cases', 'probation_cases',
+  'investigators', 'social_workers', 'paralegals', 'annual_budget', 'actual_spend',
+];
+
+// Find (or create) the single canonical dataset for a scope + fiscal year +
+// period. Submissions merge into this rather than creating a new dataset each
+// time, so different contributors' slices compose.
+async function findOrCreateDataset(db, { userId, isShared, fiscalYear, period }) {
+  const where = isShared ? 'is_shared = 1' : 'user_id = ? AND is_shared = 0';
+  const baseParams = isShared ? [] : [userId];
+  const row = await db.get(
+    `SELECT id FROM upload_history WHERE ${where} AND fiscal_year = ? AND period = ? ORDER BY uploaded_at DESC LIMIT 1`,
+    [...baseParams, fiscalYear, period]
+  );
+  if (row) return row.id;
+  const res = await db.run(
     'INSERT INTO upload_history (user_id, filename, fiscal_year, period, is_shared) VALUES (?, ?, ?, ?, ?) RETURNING id',
-    [userId, filename, fiscalYear, period || 'annual', isShared ? 1 : 0]
+    [userId, 'merged', fiscalYear, period, isShared ? 1 : 0]
   );
-  const uploadId = up.lastID;
-  await db.batch(
-    rows.map((r) => [
-      INSERT_CIRCUIT,
-      [uploadId, r.circuit, r.total_cases, r.new_cases, r.rollover_cases, r.closed_cases,
-       r.state_attorneys_filled, r.state_attorneys_vacant, r.county_attorneys,
-       r.conflict_new_cases, r.conflict_rollover_cases, r.total_contractors,
-       r.capital_cases || 0, r.felony_cases || 0, r.misdemeanor_cases || 0,
-       r.juvenile_cases || 0, r.appeals_cases || 0, r.probation_cases || 0,
-       r.investigators || 0, r.social_workers || 0, r.paralegals || 0,
-       r.annual_budget || 0, r.actual_spend || 0],
-    ])
+  return res.lastID;
+}
+
+// Merge only `fields` for each row into the dataset's circuit rows. Existing
+// values for fields not in `fields` are left untouched (the heart of compose-
+// not-overwrite). Upserts on the (upload_id, circuit) unique index.
+async function mergeRows(db, datasetId, fields, rows) {
+  const cols = fields.filter((f) => CIRCUIT_FIELDS.includes(f));
+  if (!rows.length || !cols.length) return 0;
+  const colList = ['upload_id', 'circuit', ...cols].join(', ');
+  const placeholders = ['?', '?', ...cols.map(() => '?')].join(', ');
+  const updates = cols.map((f) => `${f} = excluded.${f}`).join(', ');
+  const sql = `INSERT INTO circuit_data (${colList}) VALUES (${placeholders}) ON CONFLICT(upload_id, circuit) DO UPDATE SET ${updates}`;
+  await db.batch(rows.map((r) => [sql, [datasetId, r.circuit, ...cols.map((f) => Number(r[f] ?? 0))]]));
+  return rows.length;
+}
+
+async function logSubmission(c, db, { datasetId, templateId, fields, rowCount }) {
+  const u = c.get('user') || {};
+  await db.run(
+    'INSERT INTO submissions (dataset_id, template_id, user_id, email, fields, row_count) VALUES (?, ?, ?, ?, ?, ?)',
+    [datasetId, templateId || null, u.id || null, u.email || null, JSON.stringify(fields), rowCount]
   );
-  return uploadId;
 }
 
 // Find the most recent upload id for a scope, optionally pinned to a fiscal
@@ -162,9 +190,11 @@ data.post('/preview-headers', requireEditor(), async (c) => {
   return c.json({ ok: true, headers: info.headers, sheetName: info.sheetName, sheetNames: info.sheetNames, tempFile: token });
 });
 
-// POST /api/data/upload-mapped — read KV bytes, parse with mapping, insert
+// POST /api/data/upload-mapped — read KV bytes, parse, MERGE into the period
+// dataset. Only the fields present in the file (or the template's fields) are
+// written, so a partial upload composes with others instead of overwriting.
 data.post('/upload-mapped', requireEditor(), async (c) => {
-  const { tempFile, mapping, shared, fiscalYear, period } = await c.req.json().catch(() => ({}));
+  const { tempFile, mapping, shared, fiscalYear, period, templateId } = await c.req.json().catch(() => ({}));
   if (!tempFile) return c.json({ ok: false, error: 'No temp file specified' }, 400);
 
   const fy = fiscalYear != null && fiscalYear !== '' ? parseInt(fiscalYear, 10) : currentFiscalYear();
@@ -180,16 +210,60 @@ data.post('/upload-mapped', requireEditor(), async (c) => {
   if (!stored || !stored.value) return c.json({ ok: false, error: 'Temp file not found. Please re-upload.' }, 404);
 
   const filename = (stored.metadata && stored.metadata.filename) || 'upload.xlsx';
-  let rows;
-  try { ({ rows } = parseExcelBytes(new Uint8Array(stored.value), mapping || {})); }
+  let rows, presentFields;
+  try { ({ rows, presentFields } = parseExcelBytes(new Uint8Array(stored.value), mapping || {})); }
   catch (e) { return c.json({ ok: false, error: 'Failed to process file: ' + e.message }, 500); }
   if (!rows.length) return c.json({ ok: false, error: 'No circuit data found in file' }, 400);
 
   const db = c.get('db');
-  const uploadId = await persistUpload(db, { userId: c.get('user').id, filename, isShared, rows, fiscalYear: fy, period: per });
+  // Fields to write: the template's fields if a template was used, else the
+  // fields whose columns were actually in the file.
+  let fields = presentFields;
+  if (templateId) {
+    const t = await db.get('SELECT fields FROM templates WHERE id = ?', [templateId]);
+    if (t) { try { fields = JSON.parse(t.fields); } catch {} }
+  }
+
+  const datasetId = await findOrCreateDataset(db, { userId: c.get('user').id, isShared, fiscalYear: fy, period: per });
+  const merged = await mergeRows(db, datasetId, fields, rows);
+  await logSubmission(c, db, { datasetId, templateId, fields, rowCount: merged });
   await c.env.TEMP_UPLOADS.delete(key);
-  await audit(c, 'data.upload', { uploadId, filename, rowCount: rows.length, shared: isShared, fiscalYear: fy, period: per });
-  return c.json({ ok: true, uploadId, rowCount: rows.length, source: isShared ? 'shared' : 'personal', fiscalYear: fy, period: per });
+  await audit(c, 'data.upload', { datasetId, filename, rowCount: merged, fields, shared: isShared, fiscalYear: fy, period: per });
+  return c.json({ ok: true, uploadId: datasetId, rowCount: merged, fields, source: isShared ? 'shared' : 'personal', fiscalYear: fy, period: per });
+});
+
+// POST /api/data/submit — in-app form submission (no Excel). Body:
+// { templateId?, fiscalYear, period, shared, fields?, rows:[{circuit, <field>:val}] }
+data.post('/submit', requireEditor(), async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const rows = Array.isArray(body.rows) ? body.rows.filter((r) => r && r.circuit) : [];
+  if (!rows.length) return c.json({ ok: false, error: 'No rows to submit' }, 400);
+
+  const fy = body.fiscalYear != null && body.fiscalYear !== '' ? parseInt(body.fiscalYear, 10) : currentFiscalYear();
+  const per = body.period || 'annual';
+  const isShared = body.shared === true || body.shared === 'true';
+  if (isShared && c.get('user').role !== 'admin') {
+    return c.json({ ok: false, error: 'Only admins can submit shared data' }, 403);
+  }
+
+  const db = c.get('db');
+  let fields = Array.isArray(body.fields) ? body.fields : null;
+  if (body.templateId) {
+    const t = await db.get('SELECT fields FROM templates WHERE id = ?', [body.templateId]);
+    if (t) { try { fields = JSON.parse(t.fields); } catch {} }
+  }
+  if (!fields) {
+    // Infer from the row payload (any metric keys present).
+    const keys = new Set();
+    rows.forEach((r) => Object.keys(r).forEach((k) => { if (k !== 'circuit') keys.add(k); }));
+    fields = [...keys];
+  }
+
+  const datasetId = await findOrCreateDataset(db, { userId: c.get('user').id, isShared, fiscalYear: fy, period: per });
+  const merged = await mergeRows(db, datasetId, fields, rows);
+  await logSubmission(c, db, { datasetId, templateId: body.templateId, fields, rowCount: merged });
+  await audit(c, 'data.submit', { datasetId, rowCount: merged, fields, shared: isShared, fiscalYear: fy, period: per });
+  return c.json({ ok: true, datasetId, rowCount: merged, fields, source: isShared ? 'shared' : 'personal', fiscalYear: fy, period: per });
 });
 
 // GET /api/data/uploads — history

@@ -57,6 +57,37 @@ CREATE TABLE IF NOT EXISTS circuit_data (
   actual_spend REAL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_circuit_upload ON circuit_data(upload_id);
+-- One row per (dataset, circuit) so submissions can upsert a circuit's slice.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_circuit_unique ON circuit_data(upload_id, circuit);
+
+-- Reusable data-collection templates: a named subset of metric fields plus the
+-- scope/cadence/audience that say who fills it and how often.
+CREATE TABLE IF NOT EXISTS templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  fields TEXT NOT NULL DEFAULT '[]',          -- JSON array of metric field keys
+  scope TEXT NOT NULL DEFAULT 'circuit',       -- 'circuit' (per-circuit) | 'statewide'
+  cadence TEXT NOT NULL DEFAULT 'annual',      -- 'annual' | 'quarterly' | 'monthly'
+  owner_role TEXT,                             -- informational: who's responsible
+  created_by INTEGER,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Provenance: every submission records which template/fields a user contributed
+-- to which period dataset (drives the "who has submitted" status board).
+CREATE TABLE IF NOT EXISTS submissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  dataset_id INTEGER NOT NULL,                 -- the upload_history (period dataset) row
+  template_id INTEGER,
+  user_id INTEGER,
+  email TEXT,
+  fields TEXT,                                 -- JSON array of fields written
+  row_count INTEGER DEFAULT 0,
+  submitted_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_submissions_dataset ON submissions(dataset_id);
 
 CREATE TABLE IF NOT EXISTS column_mappings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
