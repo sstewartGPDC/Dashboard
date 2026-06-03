@@ -211,13 +211,15 @@ function renderGAChoropleth() {
   renderMapLegend(scale, isConflict);
 }
 
-function highlightCircuit(circuit, on) {
-  if (!__svgMapEl || !circuit) return;
-  __svgMapEl.querySelectorAll('path[data-circuit]').forEach(p => {
-    if (p.dataset.circuit === circuit) {
-      p.setAttribute("stroke", on ? "#1a1a1a" : "#ffffff");
-      p.setAttribute("stroke-width", on ? "1.2" : "0.5");
-    }
+// Highlight the hovered county + its circuit siblings via CSS classes (glow +
+// eased transition), matching the public site — no hard outline.
+function setCircuitHover(path, on) {
+  if (!__svgMapEl) return;
+  path.classList.toggle("is-hovered", on);
+  const circuit = path.dataset.circuit;
+  if (!circuit) return;
+  __svgMapEl.querySelectorAll('path.ga-county[data-circuit="' + circuit + '"]').forEach(p => {
+    if (p !== path) p.classList.toggle("is-circuit", on);
   });
 }
 
@@ -264,13 +266,13 @@ function initMap() {
     svg.removeAttribute("height");
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     svg.style.cssText = "width:100%;height:100%;display:block";
-    _countyPaths(svg).forEach(p => {
+    _countyPaths(svg).forEach((p, i) => {
       p.removeAttribute("style");
-      p.style.cursor = "pointer";
-      p.style.transition = "opacity .2s ease, stroke .12s ease, stroke-width .12s ease";
+      p.classList.add("ga-county", "ga-reveal");
+      p.style.animationDelay = (i * 4) + "ms"; // staggered fade-in
       p.addEventListener("mousemove", (e) => showMapTooltip(e, p));
-      p.addEventListener("mouseenter", () => highlightCircuit(p.dataset.circuit, true));
-      p.addEventListener("mouseleave", () => { hideMapTooltip(); highlightCircuit(p.dataset.circuit, false); });
+      p.addEventListener("mouseenter", () => setCircuitHover(p, true));
+      p.addEventListener("mouseleave", () => { hideMapTooltip(); setCircuitHover(p, false); });
       p.addEventListener("click", () => { const c = fipsCircuit(p.id); if (c) { setCircuitFilter(c, true); showCircuitsView(); } });
     });
     window.__map = true;

@@ -2839,3 +2839,27 @@
 .ga-leg-swatches { display: flex; gap: 2px; margin-bottom: 4px; }
 .ga-leg-swatches span { display: block; width: 18px; height: 7px; border-radius: 2px; }
 .ga-leg-range { display: flex; justify-content: space-between; color: var(--text-light, #6b6b6b); font-size: 10px; }
+
+/* County interaction (matches the public site: glow + eased, no hard outline) */
+#map svg path.ga-county {
+  cursor: pointer;
+  transition: fill .25s ease, stroke .2s ease, stroke-width .2s ease, opacity .25s ease, filter .25s ease;
+}
+/* Sibling counties in the hovered circuit — eased "delayed" highlight */
+#map svg path.ga-county.is-circuit {
+  stroke: #B85C38;
+  stroke-width: 1.1;
+  filter: drop-shadow(0 0 5px rgba(184,92,56,0.45));
+  transition: stroke .28s ease, stroke-width .28s ease, filter .28s ease;
+}
+/* The hovered county itself — instant, brighter glow */
+#map svg path.ga-county.is-hovered {
+  stroke: #8a3d22;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 0 8px rgba(184,92,56,0.6));
+  transition: stroke 0s, stroke-width 0s, filter 0s;
+}
+/* Staggered fade-in on first load */
+@keyframes gaCountyIn { from { opacity: 0; } to { opacity: 1; } }
+#map svg path.ga-county.ga-reveal { animation: gaCountyIn .5s ease backwards; }
+@media (prefers-reduced-motion: reduce) { #map svg path.ga-county.ga-reveal { animation: none; } }
