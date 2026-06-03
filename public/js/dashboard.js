@@ -156,59 +156,131 @@ const MAP_METRICS = {
   CASELOAD: { label: "Caseload", get: (cm, isConflict) => { if (isConflict) { const con = cm.conflict.totalContractors; return con > 0 ? cm.conflict.newCases / con : null; } const atty = cm.stateFilled + cm.countyAttorneys; return atty > 0 ? cm.totalCases / atty : null; } }
 };
 
-let __gaCountyLayer = null, __legendControl = null, __mapMetricKey = "NEW", __mapDataType = "normal";
+let __mapMetricKey = "NEW", __mapDataType = "normal", __svgMapEl = null, __mapTooltip = null;
+
+// FIPS code (the GA counties SVG path ids) → county slug.
+const FIPS_TO_COUNTY = {
+  '001':'appling','003':'atkinson','005':'bacon','007':'baker','009':'baldwin','011':'banks','013':'barrow','015':'bartow','017':'ben-hill','019':'berrien',
+  '021':'bibb','023':'bleckley','025':'brantley','027':'brooks','029':'bryan','031':'bulloch','033':'burke','035':'butts','037':'calhoun','039':'camden',
+  '043':'candler','045':'carroll','047':'catoosa','049':'charlton','051':'chatham','053':'chattahoochee','055':'chattooga','057':'cherokee','059':'clarke','061':'clay',
+  '063':'clayton','065':'clinch','067':'cobb','069':'coffee','071':'colquitt','073':'columbia','075':'cook','077':'coweta','079':'crawford','081':'crisp',
+  '083':'dade','085':'dawson','087':'decatur','089':'dekalb','091':'dodge','093':'dooly','095':'dougherty','097':'douglas','099':'early','101':'echols',
+  '103':'effingham','105':'elbert','107':'emanuel','109':'evans','111':'fannin','113':'fayette','115':'floyd','117':'forsyth','119':'franklin','121':'fulton',
+  '123':'gilmer','125':'glascock','127':'glynn','129':'gordon','131':'grady','133':'greene','135':'gwinnett','137':'habersham','139':'hall','141':'hancock',
+  '143':'haralson','145':'harris','147':'hart','149':'heard','151':'henry','153':'houston','155':'irwin','157':'jackson','159':'jasper','161':'jeff-davis',
+  '163':'jefferson','165':'jenkins','167':'johnson','169':'jones','171':'lamar','173':'lanier','175':'laurens','177':'lee','179':'liberty','181':'lincoln',
+  '183':'long','185':'lowndes','187':'lumpkin','189':'mcduffie','191':'mcintosh','193':'macon','195':'madison','197':'marion','199':'meriwether','201':'miller',
+  '205':'mitchell','207':'monroe','209':'montgomery','211':'morgan','213':'murray','215':'muscogee','217':'newton','219':'oconee','221':'oglethorpe','223':'paulding',
+  '225':'peach','227':'pickens','229':'pierce','231':'pike','233':'polk','235':'pulaski','237':'putnam','239':'quitman','241':'rabun','243':'randolph',
+  '245':'richmond','247':'rockdale','249':'schley','251':'screven','253':'seminole','255':'spalding','257':'stephens','259':'stewart','261':'sumter','263':'talbot',
+  '265':'taliaferro','267':'tattnall','269':'taylor','271':'telfair','273':'terrell','275':'thomas','277':'tift','279':'toombs','281':'towns','283':'treutlen',
+  '285':'troup','287':'turner','289':'twiggs','291':'union','293':'upson','295':'walker','297':'walton','299':'ware','301':'warren','303':'washington',
+  '305':'wayne','307':'webster','309':'wheeler','311':'white','313':'whitfield','315':'wilcox','317':'wilkes','319':'wilkinson','321':'worth'
+};
+const _mapNorm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const NORM_COUNTY_TO_CIRCUIT = new Map(CIRCUITS.flatMap(c => c.counties.map(co => [_mapNorm(co), c.circuit])));
+const NORM_COUNTY_TO_NAME = new Map(CIRCUITS.flatMap(c => c.counties.map(co => [_mapNorm(co), co.trim()])));
+function fipsCircuit(fips) { const slug = FIPS_TO_COUNTY[fips]; return slug ? (NORM_COUNTY_TO_CIRCUIT.get(_mapNorm(slug)) || null) : null; }
+function fipsCountyName(fips) { const slug = FIPS_TO_COUNTY[fips]; if (!slug) return fips; return NORM_COUNTY_TO_NAME.get(_mapNorm(slug)) || slug.replace(/(^|-)([a-z])/g, (m, a, b) => (a ? ' ' : '') + b.toUpperCase()); }
+function _countyPaths(svg) { return Array.from(svg.querySelectorAll('path')).filter(p => p.id && FIPS_TO_COUNTY[p.id]); }
 
 function getCircuitMetricValue(circuitName, metricKey, isConflict) { const cm = CIRCUIT_METRICS.get(circuitName); return cm ? MAP_METRICS[metricKey].get(cm, isConflict) : null; }
 function rampColor(t, isConflict) { return isConflict ? `hsl(168 ${40 + t * 20}% ${78 - t * 38}%)` : `hsl(${18 - t * 8} ${55 + t * 25}% ${78 - t * 35}%)`; }
 function makeScale(values) { const nums = values.filter(v => typeof v === "number" && isFinite(v)); return { min: Math.min(...nums), max: Math.max(...nums), hasData: nums.length > 0 }; }
 function colorForValue(v, scale, isConflict) { if (!scale.hasData || v == null) return "#e2e8f0"; if (scale.max === scale.min) return rampColor(0.5, isConflict); const t = (v - scale.min) / (scale.max - scale.min); return rampColor(Math.max(0, Math.min(1, t)), isConflict); }
 
-function renderGAChoropleth(map, geojson, fit = false) {
-  if (!geojson) return;
+// Color the SVG counties by the selected metric (choropleth). Same data path
+// as before; renders into the website's Georgia SVG instead of Leaflet.
+function renderGAChoropleth() {
+  const svg = __svgMapEl;
+  if (!svg) return;
   const isConflict = __mapDataType === "conflict";
-  if (__gaCountyLayer) { __gaCountyLayer.remove(); __gaCountyLayer = null; }
-  if (__legendControl) { __legendControl.remove(); __legendControl = null; }
-  const vals = geojson.features.map(f => { const circuit = COUNTY_TO_CIRCUIT.get(normCountyName(f?.properties?.name)); return circuit ? getCircuitMetricValue(circuit, __mapMetricKey, isConflict) : null; });
+  const paths = _countyPaths(svg);
+  const vals = paths.map(p => { const c = fipsCircuit(p.id); return c ? getCircuitMetricValue(c, __mapMetricKey, isConflict) : null; });
   const scale = makeScale(vals);
-  
-  __gaCountyLayer = L.geoJSON(geojson, {
-    style: (feature) => { const circuit = COUNTY_TO_CIRCUIT.get(normCountyName(feature?.properties?.name)); const v = circuit ? getCircuitMetricValue(circuit, __mapMetricKey, isConflict) : null; const active = (ui.circuit === "All" || ui.circuit === circuit); return { color: "#0a1628", weight: 0.6, opacity: active ? 0.9 : 0.25, fillOpacity: active ? 0.75 : 0.2, fillColor: circuit ? colorForValue(v, scale, isConflict) : "#e2e8f0" }; },
-    onEachFeature: (feature, layer) => {
-      const countyRaw = feature?.properties?.name || "Unknown";
-      const circuit = COUNTY_TO_CIRCUIT.get(normCountyName(countyRaw));
-      const cm = circuit ? CIRCUIT_METRICS.get(circuit) : null;
-      let html = `<div style="min-width:180px;font-family:'Manrope',-apple-system,sans-serif"><div style="font-weight:700;font-size:13px">${countyRaw} County</div><div style="font-size:11px;color:#6b6b6b;margin-top:3px">${circuit ? `Circuit: <strong>${circuit}</strong>` : '<span style="color:#b91c1c">Unmapped</span>'}</div>`;
-      if (cm) {
-        const totalAtty = cm.stateFilled + cm.countyAttorneys;
-        if (isConflict) {
-          html += `<div style="margin-top:8px;font-size:10px;font-weight:600;color:#2a7d6e">CONFLICT</div><div style="margin-top:4px;display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px"><div><strong>${fmt(cm.conflict.newCases)}</strong><div style="color:#6b6b6b">New Cases</div></div><div><strong>${fmt(cm.conflict.totalContractors)}</strong><div style="color:#6b6b6b">Contractors</div></div></div>`;
-        } else {
-          html += `<div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px"><div><strong>${fmt(cm.totalCases)}</strong><div style="color:#6b6b6b">Total</div></div><div><strong>${fmt(cm.newCases)}</strong><div style="color:#6b6b6b">New</div></div><div><strong>${fmt(cm.stateFilled)}</strong><div style="color:#6b6b6b">State</div></div><div><strong>${fmt(cm.countyAttorneys)}</strong><div style="color:#6b6b6b">County</div></div><div><strong>${fmt(totalAtty)}</strong><div style="color:#6b6b6b">Attorneys</div></div><div><strong>${totalAtty > 0 ? (cm.totalCases/totalAtty).toFixed(1) : '—'}</strong><div style="color:#6b6b6b">Caseload</div></div></div>`;
-        }
-      }
-      html += '</div>';
-      layer.bindTooltip(html, { sticky: true });
-      layer.on("mouseover", () => layer.setStyle({ weight: 2 }));
-      layer.on("mouseout", () => layer.setStyle({ weight: 0.6 }));
-      layer.on("click", () => { if (circuit) { setCircuitFilter(circuit, true); showCircuitsView(); } });
+  paths.forEach(p => {
+    const circuit = fipsCircuit(p.id);
+    const v = circuit ? getCircuitMetricValue(circuit, __mapMetricKey, isConflict) : null;
+    const active = (ui.circuit === "All" || ui.circuit === circuit);
+    p.dataset.circuit = circuit || "";
+    p.setAttribute("fill", circuit ? colorForValue(v, scale, isConflict) : "#ececec");
+    p.setAttribute("stroke", "#ffffff");
+    p.setAttribute("stroke-width", "0.5");
+    p.style.opacity = active ? "1" : "0.28";
+  });
+  renderMapLegend(scale, isConflict);
+}
+
+function highlightCircuit(circuit, on) {
+  if (!__svgMapEl || !circuit) return;
+  __svgMapEl.querySelectorAll('path[data-circuit]').forEach(p => {
+    if (p.dataset.circuit === circuit) {
+      p.setAttribute("stroke", on ? "#1a1a1a" : "#ffffff");
+      p.setAttribute("stroke-width", on ? "1.2" : "0.5");
     }
-  }).addTo(map);
-  
-  if (fit) { const bounds = __gaCountyLayer.getBounds(); if (bounds?.isValid()) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 8 }); }
-  
-  __legendControl = L.control({ position: "bottomright" });
-  __legendControl.onAdd = () => { const div = L.DomUtil.create("div"); div.style.cssText = "background:white;padding:10px 12px;border-radius:12px;border:1px solid #e5e2dd;box-shadow:0 4px 24px rgba(0,0,0,0.06);font-family:'Manrope',system-ui,sans-serif;font-size:11px"; const swatches = [0, 0.25, 0.5, 0.75, 1].map(t => rampColor(t, isConflict)); div.innerHTML = `<div style="font-weight:600;margin-bottom:3px;color:#1a1a1a">${MAP_METRICS[__mapMetricKey].label}</div><div style="font-size:9px;color:${isConflict ? '#2a7d6e' : '#B85C38'};font-weight:600;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px">${isConflict ? 'Conflict' : 'Circuit Office'}</div><div style="display:flex;gap:2px;margin-bottom:4px">${swatches.map(c => `<span style="display:block;width:18px;height:7px;border-radius:2px;background:${c}"></span>`).join('')}</div><div style="display:flex;justify-content:space-between;color:#6b6b6b;font-size:10px"><span>${scale.hasData ? scale.min.toFixed(__mapMetricKey === 'CASELOAD' ? 1 : 0) : '—'}</span><span>${scale.hasData ? scale.max.toFixed(__mapMetricKey === 'CASELOAD' ? 1 : 0) : '—'}</span></div>`; return div; };
-  __legendControl.addTo(map);
+  });
+}
+
+function hideMapTooltip() { if (__mapTooltip) __mapTooltip.style.opacity = "0"; }
+function showMapTooltip(e, p) {
+  if (!__mapTooltip) return;
+  const circuit = fipsCircuit(p.id);
+  const name = fipsCountyName(p.id);
+  const isConflict = __mapDataType === "conflict";
+  let html = `<strong>${name} County</strong><span>${circuit ? circuit + " Circuit" : "Unmapped"}</span>`;
+  if (circuit && CIRCUIT_METRICS.get(circuit)) {
+    const v = getCircuitMetricValue(circuit, __mapMetricKey, isConflict);
+    const disp = v == null ? "—" : (__mapMetricKey === "CASELOAD" ? v.toFixed(1) : fmt(v));
+    html += `<div class="ga-map-tip-metric">${MAP_METRICS[__mapMetricKey].label}: <b>${disp}</b></div>`;
+  }
+  __mapTooltip.innerHTML = html;
+  __mapTooltip.style.left = (e.clientX + 14) + "px";
+  __mapTooltip.style.top = (e.clientY + 14) + "px";
+  __mapTooltip.style.opacity = "1";
+}
+
+function renderMapLegend(scale, isConflict) {
+  const el = document.getElementById("gaMapLegend");
+  if (!el) return;
+  const swatches = [0, 0.25, 0.5, 0.75, 1].map(t => rampColor(t, isConflict));
+  const dec = __mapMetricKey === "CASELOAD" ? 1 : 0;
+  el.innerHTML = `<div class="ga-leg-title">${MAP_METRICS[__mapMetricKey].label}</div>`
+    + `<div class="ga-leg-sub" style="color:${isConflict ? "#2a7d6e" : "#B85C38"}">${isConflict ? "Conflict" : "Circuit Office"}</div>`
+    + `<div class="ga-leg-swatches">${swatches.map(c => `<span style="background:${c}"></span>`).join("")}</div>`
+    + `<div class="ga-leg-range"><span>${scale.hasData ? scale.min.toFixed(dec) : "—"}</span><span>${scale.hasData ? scale.max.toFixed(dec) : "—"}</span></div>`;
 }
 
 function initMap() {
-  const map = L.map("map", { zoomControl: true, minZoom: 6, maxZoom: 12 }).setView([32.7, -83.5], 7);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 18, attribution: '&copy; OSM &copy; CARTO' }).addTo(map);
-  window.__map = map;
-  $("mapDataSelect").addEventListener("change", (e) => { __mapDataType = e.target.value; if (window.__gaCountiesGeoJSON) renderGAChoropleth(map, window.__gaCountiesGeoJSON); });
-  $("mapMetricSelect").addEventListener("change", (e) => { __mapMetricKey = e.target.value; if (window.__gaCountiesGeoJSON) renderGAChoropleth(map, window.__gaCountiesGeoJSON); });
-  $("mapResetBtn").addEventListener("click", () => { ui.circuit = "All"; $("circuitSelect").value = "All"; refreshCountyOptions(); ui.county = "All"; $("countySelect").value = "All"; rerender(); if (window.__gaCountiesGeoJSON && __gaCountyLayer) { const bounds = __gaCountyLayer.getBounds(); if (bounds?.isValid()) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 8 }); } });
-  fetch("https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json").then(r => r.json()).then(topology => { const allCounties = topojson.feature(topology, topology.objects.counties); window.__gaCountiesGeoJSON = { type: "FeatureCollection", features: allCounties.features.filter(f => String(f.id || "").startsWith("13")) }; renderGAChoropleth(map, window.__gaCountiesGeoJSON, true); }).catch(err => { console.error(err); $("map").innerHTML = '<div style="padding:2rem;text-align:center;color:#6b6b6b">Failed to load counties.</div>'; });
+  const container = document.getElementById("map");
+  if (!container) return;
+  if (!__mapTooltip) { __mapTooltip = document.createElement("div"); __mapTooltip.className = "ga-map-tooltip"; document.body.appendChild(__mapTooltip); }
+
+  fetch("images/georgia-wiki.svg").then(r => r.text()).then(txt => {
+    container.innerHTML = txt + '<div class="ga-map-legend" id="gaMapLegend"></div>';
+    const svg = container.querySelector("svg");
+    if (!svg) return;
+    __svgMapEl = svg;
+    svg.removeAttribute("width");
+    svg.removeAttribute("height");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.style.cssText = "width:100%;height:100%;display:block";
+    _countyPaths(svg).forEach(p => {
+      p.removeAttribute("style");
+      p.style.cursor = "pointer";
+      p.style.transition = "opacity .2s ease, stroke .12s ease, stroke-width .12s ease";
+      p.addEventListener("mousemove", (e) => showMapTooltip(e, p));
+      p.addEventListener("mouseenter", () => highlightCircuit(p.dataset.circuit, true));
+      p.addEventListener("mouseleave", () => { hideMapTooltip(); highlightCircuit(p.dataset.circuit, false); });
+      p.addEventListener("click", () => { const c = fipsCircuit(p.id); if (c) { setCircuitFilter(c, true); showCircuitsView(); } });
+    });
+    window.__map = true;
+    window.__gaCountiesGeoJSON = true;
+    renderGAChoropleth();
+  }).catch(err => { console.error("Map load failed", err); container.innerHTML = '<div style="padding:2rem;text-align:center;color:#6b6b6b">Failed to load map.</div>'; });
+
+  document.getElementById("mapDataSelect").addEventListener("change", (e) => { __mapDataType = e.target.value; renderGAChoropleth(); });
+  document.getElementById("mapMetricSelect").addEventListener("change", (e) => { __mapMetricKey = e.target.value; renderGAChoropleth(); });
+  document.getElementById("mapResetBtn").addEventListener("click", () => { ui.circuit = "All"; const cs = document.getElementById("circuitSelect"); if (cs) cs.value = "All"; if (typeof refreshCountyOptions === "function") refreshCountyOptions(); ui.county = "All"; const cn = document.getElementById("countySelect"); if (cn) cn.value = "All"; rerender(); });
 }
 
 // ─── Charts Rendering ────────────────────────────────────────────────
@@ -620,13 +692,8 @@ function showMapView() {
   hideAllViews();
   $("viewMap").classList.add("active");
   $("tabMap").classList.add("active");
-  if (window.__map) setTimeout(() => {
-    window.__map.invalidateSize();
-    if (window.__gaCountiesGeoJSON && __gaCountyLayer) {
-      const bounds = __gaCountyLayer.getBounds();
-      if (bounds?.isValid()) window.__map.fitBounds(bounds, { padding: [30, 30], maxZoom: 8 });
-    }
-  }, 100);
+  // Re-color with the latest data/filter each time the map is opened.
+  renderGAChoropleth();
 }
 
 function showUploadView() {
