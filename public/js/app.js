@@ -143,6 +143,9 @@ async function loadDataFromAPI(source) {
 
     const hasUploadedData = data.source !== 'sample' && data.circuits && data.circuits.length;
 
+    // Circuits + Map views only make sense with data — hide their tabs until then.
+    updateNavTabs(hasUploadedData);
+
     // Show/hide clear data button based on whether data exists
     const clearSection = $('clearDataSection');
     if (clearSection) clearSection.style.display = hasUploadedData ? '' : 'none';
@@ -269,6 +272,20 @@ function updateDataSourceBadge(source) {
   } else if (source === 'personal') {
     badge.textContent = 'My Data';
     badge.className = 'data-source-badge personal';
+  }
+}
+
+// Show the Circuits + Map tabs only when data exists; if data goes away while
+// on one of those views, fall back to the Dashboard view.
+function updateNavTabs(hasData) {
+  const circuits = $('tabCircuits');
+  const map = $('tabMap');
+  if (circuits) circuits.style.display = hasData ? '' : 'none';
+  if (map) map.style.display = hasData ? '' : 'none';
+  if (!hasData) {
+    const onOther = ($('viewCircuits') && $('viewCircuits').classList.contains('active')) ||
+                    ($('viewMap') && $('viewMap').classList.contains('active'));
+    if (onOther && typeof showDashboardView === 'function') showDashboardView();
   }
 }
 
