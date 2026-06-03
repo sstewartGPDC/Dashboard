@@ -414,7 +414,17 @@ const chartEngine = {
       this.removeCard(config.id);
     });
 
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'chart-toolbar-btn';
+    exportBtn.title = 'Export card as image';
+    exportBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    exportBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (typeof exportSingleCard === 'function') exportSingleCard(panel, config.title);
+    });
+
     toolbar.appendChild(editBtn);
+    toolbar.appendChild(exportBtn);
     toolbar.appendChild(deleteBtn);
     header.appendChild(toolbar);
 
@@ -533,6 +543,8 @@ const chartEngine = {
       renderScorecard(bodyId, config);
     } else if (config.type === 'compare') {
       renderCompareCard(bodyId, config);
+    } else if (config.type === 'equity') {
+      renderEquityCard(bodyId, config);
     }
   },
 
@@ -817,6 +829,8 @@ const chartEngine = {
       renderScorecard(bodyId, config);
     } else if (config.type === 'compare') {
       renderCompareCard(bodyId, config);
+    } else if (config.type === 'equity') {
+      renderEquityCard(bodyId, config);
     }
   },
 
@@ -912,6 +926,15 @@ const chartEngine = {
         html += '<option value="' + n + '"' + (Number(config.limit || 8) === n ? ' selected' : '') + '>' + n + ' circuits</option>';
       });
       html += '</select></div>';
+    }
+
+    if (config.type === 'equity') {
+      html += '<div class="editor-row"><label>Data Field</label><select data-edit="field">';
+      Object.entries(CHART_FIELDS).forEach(([key, f]) => {
+        html += '<option value="' + key + '"' + ((config.field || 'caseload') === key ? ' selected' : '') + '>' + f.label + '</option>';
+      });
+      html += '</select></div>';
+      html += '<div class="editor-row"><div class="editor-hint">Compares every circuit to the statewide average for this metric, and reports the disparity ratio (highest &divide; lowest).</div></div>';
     }
 
     if (config.type === 'scorecard') {
@@ -1514,6 +1537,13 @@ const chartEngine = {
       +       '<div class="chart-add-option-desc">Current vs. prior year, grouped bars</div>'
       +     '</div>'
       +   '</button>'
+      +   '<button class="chart-add-option" data-type="equity">'
+      +     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M3 7h7l-3.5 5a3.5 3.5 0 0 0 7 0L10 7"/><path d="M21 7h-7l3.5 5a3.5 3.5 0 0 0 7 0L17.5 12"/></svg>'
+      +     '<div>'
+      +       '<div class="chart-add-option-label">Equity Analysis</div>'
+      +       '<div class="chart-add-option-desc">Per-circuit disparity vs. statewide average</div>'
+      +     '</div>'
+      +   '</button>'
       + '</div>';
     const addBtn = addWrap.querySelector('#chartAddBtn');
     const picker = addWrap.querySelector('#chartAddPicker');
@@ -1564,6 +1594,8 @@ const chartEngine = {
       newCard = { id, type: 'scorecard', title: 'Circuit Scorecard', subtitle: 'Caseload vs. standard', width: 'full', standard: 150 };
     } else if (type === 'compare') {
       newCard = { id, type: 'compare', title: 'Year-over-Year', subtitle: 'Current vs. prior year', width: 'large', field: 'totalCases', limit: 8 };
+    } else if (type === 'equity') {
+      newCard = { id, type: 'equity', title: 'Equity Analysis', subtitle: 'Per-circuit disparity', width: 'full', field: 'caseload' };
     } else {
       newCard = { id, type: 'bar', title: 'New Bar Chart', subtitle: 'Click to configure', width: 'medium', ...barDefaults };
     }

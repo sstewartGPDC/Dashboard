@@ -59,6 +59,27 @@ function exportData(format) {
   }
 }
 
+// ── Single-card image export ─────────────────────────────────────────
+function exportSingleCard(panelEl, title) {
+  if (typeof html2canvas === 'undefined') { alert('Image export is unavailable (library not loaded).'); return; }
+  if (!panelEl) return;
+  // Hide the card's toolbar for a clean shot.
+  const tb = panelEl.querySelector('.chart-card-toolbar');
+  const prevDisplay = tb ? tb.style.display : null;
+  if (tb) tb.style.display = 'none';
+  const restore = () => { if (tb) tb.style.display = prevDisplay || ''; };
+
+  html2canvas(panelEl, { scale: 2, backgroundColor: '#ffffff', logging: false })
+    .then((canvas) => {
+      restore();
+      const fy = window.__currentFY ? 'FY' + String(window.__currentFY).slice(-2) + '_' : '';
+      const name = (title || 'card').replace(/[^a-zA-Z0-9_ -]/g, '').trim().replace(/\s+/g, '_') || 'card';
+      const date = new Date().toISOString().slice(0, 10);
+      canvas.toBlob((blob) => { if (blob) _gpdcDownload(blob, 'image/png', `GPDC_${fy}${name}_${date}.png`); }, 'image/png');
+    })
+    .catch((err) => { restore(); console.error('Card export failed:', err); });
+}
+
 // ── Template gallery ─────────────────────────────────────────────────
 function openTemplateGallery() {
   if (typeof GALLERY_TEMPLATES === 'undefined') return;

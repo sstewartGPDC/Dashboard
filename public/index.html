@@ -1077,6 +1077,25 @@
 
         .editor-hint { font-size:0.72rem; color:var(--text-light,#888); line-height:1.4; }
 
+        /* Equity Analysis card */
+        .eq-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:0.75rem; margin-bottom:1rem; }
+        .eq-stat { background:var(--bg-light,#f9f8f6); border:1px solid var(--border-light,#e5e2dd); border-radius:10px; padding:0.6rem 0.7rem; }
+        .eq-stat-label { font-size:0.64rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-light,#6b6b6b); font-weight:700; }
+        .eq-stat-val { font-family:'Ubuntu',sans-serif; font-weight:700; font-size:1.15rem; color:var(--text-dark,#1a1a1a); margin-top:0.2rem; line-height:1.15; }
+        .eq-stat-sub { display:block; font-size:0.66rem; font-weight:500; color:var(--text-medium,#4a4a4a); font-family:'Manrope',sans-serif; margin-top:0.1rem; }
+        .eq-legend { display:flex; align-items:center; gap:0.3rem; font-size:0.72rem; color:var(--text-medium,#4a4a4a); font-family:'JetBrains Mono',monospace; margin-bottom:0.6rem; }
+        .eq-key { width:11px; height:11px; border-radius:3px; display:inline-block; margin-left:0.6rem; }
+        .eq-chart { display:flex; flex-direction:column; gap:0.32rem; }
+        .eq-row { display:grid; grid-template-columns:120px 1fr 66px; align-items:center; gap:0.5rem; }
+        .eq-name { font-size:0.78rem; color:var(--text-dark,#1a1a1a); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .eq-track { height:10px; background:var(--border-light,#e5e2dd); border-radius:5px; overflow:hidden; }
+        .eq-fill { height:100%; border-radius:5px; }
+        .eq-fill.eq-above, .eq-key.eq-above { background:#c0673f; }
+        .eq-fill.eq-below, .eq-key.eq-below { background:#7fae8e; }
+        .eq-val { font-family:'JetBrains Mono',monospace; font-size:0.78rem; text-align:right; font-weight:600; color:var(--text-dark,#1a1a1a); }
+        .eq-more { font-size:0.72rem; color:var(--text-light,#888); margin-top:0.5rem; font-family:'JetBrains Mono',monospace; }
+        @media (max-width:640px){ .eq-stats { grid-template-columns:repeat(2,1fr); } }
+
         /* Lock / present mode */
         .dashboard-bar-template-btn.lock-active { background:var(--primary,#B85C38); color:#fff; border-color:var(--primary,#B85C38); }
         .dashboard-charts-section.dash-locked .chart-card-toolbar,

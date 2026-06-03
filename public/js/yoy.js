@@ -151,6 +151,57 @@ function renderScorecard(bodyId, config) {
     </table></div>`;
 }
 
+// ─── Equity Analysis card ────────────────────────────────────────────
+// Per-circuit disparity for a chosen metric: statewide average, highest/lowest
+// circuit, disparity ratio, and a distribution (bars colored above/below avg).
+function renderEquityCard(bodyId, config) {
+  const el = document.getElementById(bodyId);
+  if (!el) return;
+  const field = config.field || 'caseload';
+  const fd = typeof CHART_FIELDS !== 'undefined' && CHART_FIELDS[field];
+  if (!fd) { el.innerHTML = '<div class="empty-state">Unknown metric.</div>'; return; }
+
+  const fc = getFilteredCircuits();
+  let rows = fc.map((c) => {
+    const m = CIRCUIT_METRICS.get(c.circuit) || emptyMetrics();
+    return { circuit: c.circuit, value: fd.getCircuit(m) };
+  }).filter((r) => r.value > 0);
+  if (rows.length < 2) { el.innerHTML = '<div class="empty-state">Not enough circuit data for an equity comparison.</div>'; return; }
+
+  const vals = rows.map((r) => r.value);
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  rows.sort((a, b) => b.value - a.value);
+  const high = rows[0], low = rows[rows.length - 1];
+  const disparity = low.value > 0 ? high.value / low.value : 0;
+  const above = vals.filter((v) => v > avg).length;
+  const isPct = field === 'vacancyRate' || field === 'supportRatio';
+  const fmtV = (v) => isPct ? (v * 100).toFixed(1) + '%' : (Number.isInteger(v) ? fmt(v) : v.toFixed(1));
+  const max = high.value;
+  const shown = rows.slice(0, 18);
+  const truncated = rows.length - shown.length;
+
+  const bars = shown.map((r) => {
+    const w = max > 0 ? (r.value / max) * 100 : 0;
+    const cls = r.value > avg ? 'eq-above' : 'eq-below';
+    return `<div class="eq-row">
+      <div class="eq-name" title="${r.circuit}">${r.circuit}</div>
+      <div class="eq-track"><div class="eq-fill ${cls}" style="width:${w.toFixed(1)}%"></div></div>
+      <div class="eq-val">${fmtV(r.value)}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="eq-stats">
+      <div class="eq-stat"><div class="eq-stat-label">Statewide avg</div><div class="eq-stat-val">${fmtV(avg)}</div></div>
+      <div class="eq-stat"><div class="eq-stat-label">Highest</div><div class="eq-stat-val">${fmtV(high.value)}<span class="eq-stat-sub">${high.circuit}</span></div></div>
+      <div class="eq-stat"><div class="eq-stat-label">Lowest</div><div class="eq-stat-val">${fmtV(low.value)}<span class="eq-stat-sub">${low.circuit}</span></div></div>
+      <div class="eq-stat"><div class="eq-stat-label">Disparity</div><div class="eq-stat-val">${disparity.toFixed(1)}&times;<span class="eq-stat-sub">${above} of ${rows.length} above avg</span></div></div>
+    </div>
+    <div class="eq-legend"><span class="eq-key eq-above"></span>Above average<span class="eq-key eq-below"></span>At or below</div>
+    <div class="eq-chart">${bars}</div>
+    ${truncated > 0 ? `<div class="eq-more">+ ${truncated} more circuits</div>` : ''}`;
+}
+
 // ─── Year-over-Year comparison card (grouped bars) ───────────────────
 function renderCompareCard(bodyId, config) {
   const el = document.getElementById(bodyId);
