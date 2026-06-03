@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Base path: makes relative asset/API URLs resolve under wherever the app
+       is mounted (root in dev, /intranet/apps/dashboards/ in production). -->
+  <script>(function(){var d=location.pathname.replace(/[^/]*$/,'');var b=document.createElement('base');b.href=d;document.head.appendChild(b);}());</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GPDC Dashboards</title>
@@ -27,7 +30,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <!-- Dashboard Styles -->
-  <link rel="stylesheet" href="/css/dashboard.css">
+  <link rel="stylesheet" href="css/dashboard.css">
 
   <style>
     /* ── New three-zone header ── */
@@ -954,7 +957,7 @@
         </div>
         <span class="upload-status" id="uploadStatus">Data loaded successfully</span>
         <div class="upload-panel-hint">Accepts .xlsx and .xls files</div>
-        <a href="/api/data/template" download class="upload-template-link" id="downloadTemplateBtn">
+        <a href="api/data/template" download class="upload-template-link" id="downloadTemplateBtn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Download Template
         </a>
@@ -1286,15 +1289,15 @@
   </div>
 
   <!-- Dashboard JavaScript (load order matters) -->
-  <script src="/js/data.js"></script>
-  <script src="/js/dashboard.js"></script>
-  <script src="/js/chart-engine.js"></script>
-  <script src="/js/upload.js"></script>
-  <script src="/js/reports.js"></script>
-  <script src="/js/table-export.js"></script>
-  <script src="/js/yoy.js"></script>
-  <script src="/js/templates.js"></script>
-  <script src="/js/extras.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/chart-engine.js"></script>
+  <script src="js/upload.js"></script>
+  <script src="js/reports.js"></script>
+  <script src="js/table-export.js"></script>
+  <script src="js/yoy.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/extras.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

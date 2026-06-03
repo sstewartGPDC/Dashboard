@@ -114,7 +114,7 @@ const chartEngine = {
 
   async loadDashboards() {
     try {
-      const res = await fetch('/api/dashboards');
+      const res = await fetch('api/dashboards');
       const data = await res.json();
       this._dashboards = Array.isArray(data) ? data : (data.dashboards || []);
       // Find the active dashboard, or fallback to first
@@ -136,7 +136,7 @@ const chartEngine = {
 
   async loadDashboard(id) {
     try {
-      const res = await fetch('/api/dashboards/' + id);
+      const res = await fetch('api/dashboards/' + id);
       const data = await res.json();
       const dash = data.dashboard || data;
       this._activeDashboardId = dash.id || id;
@@ -173,7 +173,7 @@ const chartEngine = {
   async saveDashboard() {
     if (!this._activeDashboardId) return;
     try {
-      await fetch('/api/dashboards/' + this._activeDashboardId, {
+      await fetch('api/dashboards/' + this._activeDashboardId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -189,7 +189,7 @@ const chartEngine = {
 
   async createDashboard(name, layout) {
     try {
-      const res = await fetch('/api/dashboards', {
+      const res = await fetch('api/dashboards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -208,7 +208,7 @@ const chartEngine = {
 
   async deleteDashboard(id) {
     try {
-      await fetch('/api/dashboards/' + id, { method: 'DELETE' });
+      await fetch('api/dashboards/' + id, { method: 'DELETE' });
       this._dashboards = this._dashboards.filter(d => d.id !== id);
     } catch (err) {
       console.error('Failed to delete dashboard:', err);
@@ -222,7 +222,7 @@ const chartEngine = {
 
   async switchDashboard(id) {
     try {
-      await fetch('/api/dashboards/' + id + '/activate', { method: 'POST' });
+      await fetch('api/dashboards/' + id + '/activate', { method: 'POST' });
     } catch (err) {
       console.error('Failed to activate dashboard:', err);
     }

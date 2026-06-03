@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Base path: makes relative asset/API URLs resolve under wherever the app
+       is mounted (root in dev, /intranet/apps/dashboards/ in production). -->
+  <script>(function(){var d=location.pathname.replace(/[^/]*$/,'');var b=document.createElement('base');b.href=d;document.head.appendChild(b);}());</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GPDC Dashboards — Sign In</title>
@@ -153,7 +156,7 @@
       errEl.classList.remove('show');
 
       try {
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch('api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -163,7 +166,7 @@
         });
         const data = await res.json();
         if (data.ok) {
-          window.location.href = '/';
+          window.location.href = '.';
         } else {
           errEl.textContent = data.error || 'Login failed';
           errEl.classList.add('show');

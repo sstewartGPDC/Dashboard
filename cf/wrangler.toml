@@ -4,12 +4,12 @@ compatibility_date = "2024-09-23"
 # SheetJS reaches for Buffer; nodejs_compat provides it (proven in the POC).
 compatibility_flags = ["nodejs_compat"]
 
-# Serve the app at its own subdomain on the gapubdef.org zone. On `wrangler
-# deploy` this creates the DNS record + cert automatically (the zone must be in
-# the same Cloudflare account). Put a Cloudflare Access policy on this hostname
-# — the same one that protects /intranet — so it's staff-gated.
+# Serve the app under the intranet sub-path on the gapubdef.org zone. This
+# Worker route takes priority over Pages for matching requests; everything else
+# on the zone still goes to the Pages site. The same Cloudflare Access policy
+# that protects /intranet covers this path, so it's staff-gated.
 routes = [
-  { pattern = "dashboard.gapubdef.org", custom_domain = true },
+  { pattern = "gapubdef.org/intranet/apps/dashboards*", zone_name = "gapubdef.org" },
 ]
 
 # Serve the existing frontend (public/) as static assets. The Worker handles
@@ -35,3 +35,6 @@ id = "2ccf255aed7e4c23bee4bed9cd7aea80"
 # same identities you'd put in the Cloudflare Access policy as admins.
 # 'dev@local' is the fallback identity used in local `wrangler dev` (no Access).
 ADMIN_EMAILS = "dev@local, sstewart@gapubdef.org"
+# Sub-path the app is mounted under. The Worker strips this prefix before
+# routing; the frontend resolves relative URLs via a <base> tag. Empty = root.
+BASE_PATH = "/intranet/apps/dashboards"

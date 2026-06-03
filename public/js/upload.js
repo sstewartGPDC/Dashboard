@@ -155,7 +155,7 @@ async function handleFileSelect(file) {
   formData.append('file', file);
 
   try {
-    const res = await fetch('/api/data/preview-headers', { method: 'POST', body: formData });
+    const res = await fetch('api/data/preview-headers', { method: 'POST', body: formData });
     const data = await res.json();
     if (!data.ok) {
       status.textContent = 'Error: ' + data.error;
@@ -193,7 +193,7 @@ async function submitMappedUpload() {
   btn.textContent = 'Uploading...';
 
   try {
-    const res = await fetch('/api/data/upload-mapped', {
+    const res = await fetch('api/data/upload-mapped', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tempFile: _uploadTempFile, mapping, shared: isShared })

@@ -40,4 +40,27 @@ app.onError((err, c) => {
   return c.text('Server error', 500);
 });
 
-export default app;
+// Mount the app under a base path (e.g. /intranet/apps/dashboards) when BASE_PATH
+// is set. We strip the prefix before routing so the Hono routes and ASSETS
+// binding see root-relative paths; the frontend resolves its relative URLs via a
+// <base> tag derived from the served path. BASE_PATH unset → app runs at root.
+export default {
+  async fetch(request, env, ctx) {
+    const base = (env.BASE_PATH || '').replace(/\/$/, '');
+    if (base) {
+      const url = new URL(request.url);
+      if (url.pathname === base) {
+        // Canonicalize to a trailing slash so the <base> tag resolves correctly.
+        url.pathname = base + '/';
+        return Response.redirect(url.toString(), 301);
+      }
+      if (url.pathname.startsWith(base + '/')) {
+        url.pathname = url.pathname.slice(base.length) || '/';
+        request = new Request(url.toString(), request);
+      } else if (url.pathname.startsWith(base)) {
+        // e.g. "/intranet/apps/dashboardsX" — not ours; pass through unchanged.
+      }
+    }
+    return app.fetch(request, env, ctx);
+  },
+};

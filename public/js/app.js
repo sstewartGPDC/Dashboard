@@ -126,7 +126,7 @@ async function loadDataFromAPI(source) {
   try {
     const src = source || currentSource();
     const fyParam = window.__currentFY ? `&fy=${window.__currentFY}` : '';
-    const url = `/api/data?source=${src}${fyParam}`;
+    const url = `api/data?source=${src}${fyParam}`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -199,7 +199,7 @@ async function refreshComparison(source) {
   if (!window.__compareFY) return;
   try {
     const src = source || currentSource();
-    const res = await fetch(`/api/data?source=${src}&fy=${window.__compareFY}`);
+    const res = await fetch(`api/data?source=${src}&fy=${window.__compareFY}`);
     const data = await res.json();
     if (data.ok && data.circuits && data.circuits.length) {
       const m = new Map();
@@ -218,7 +218,7 @@ async function loadPeriods() {
   const ctl = $('periodControls');
   if (!periodSel || !compareSel) return;
   try {
-    const res = await fetch(`/api/data/periods?source=${currentSource()}`);
+    const res = await fetch(`api/data/periods?source=${currentSource()}`);
     const data = await res.json();
     const all = (data.ok && data.periods) ? data.periods : [];
     // Annual periods only, de-duped by fiscal year, newest first.
@@ -283,7 +283,7 @@ function showEmptyState(show) {
 async function handleClearData() {
   if (!confirm('Are you sure you want to clear all uploaded data? This cannot be undone.')) return;
   try {
-    const res = await fetch('/api/data/clear', { method: 'DELETE' });
+    const res = await fetch('api/data/clear', { method: 'DELETE' });
     const data = await res.json();
     if (data.ok) {
       FIELD_LABELS = { ...DEFAULT_FIELD_LABELS };
@@ -315,10 +315,10 @@ function setupDropdown(btnId, dropdownId) {
 async function initApp() {
   // 1. Check authentication
   try {
-    const res = await fetch('/api/auth/me');
+    const res = await fetch('api/auth/me');
     const data = await res.json();
     if (!data.ok) {
-      window.location.href = '/login.html';
+      window.location.href = 'login.html';
       return;
     }
     window.__userRole = data.user.role;
@@ -345,7 +345,7 @@ async function initApp() {
     }
   } catch (err) {
     console.error('Auth check failed:', err);
-    window.location.href = '/login.html';
+    window.location.href = 'login.html';
     return;
   }
 
@@ -439,7 +439,7 @@ async function initApp() {
       const fields = [...fieldKeys].join(',');
       const name = encodeURIComponent(chartEngine._activeDashboardName || 'Dashboard');
       try {
-        const res = await fetch(`/api/data/template-for-dashboard?fields=${fields}&name=${name}`);
+        const res = await fetch(`api/data/template-for-dashboard?fields=${fields}&name=${name}`);
         if (!res.ok) throw new Error('Download failed');
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -463,7 +463,7 @@ async function initApp() {
     genericTemplateBtn.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
-        const res = await fetch('/api/data/template');
+        const res = await fetch('api/data/template');
         if (!res.ok) throw new Error('Download failed');
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -487,7 +487,7 @@ async function initApp() {
     welcomeTemplateLink.addEventListener('click', async (e) => {
       e.preventDefault();
       try {
-        const res = await fetch('/api/data/template');
+        const res = await fetch('api/data/template');
         if (!res.ok) throw new Error('Download failed');
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -580,8 +580,8 @@ async function initApp() {
 
   // 11. Logout
   $('logoutBtn')?.addEventListener('click', async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.href = '/login.html';
+    await fetch('api/auth/logout', { method: 'POST' });
+    window.location.href = 'login.html';
   });
 
   // 12. Clear data (both upload panel button and header dropdown button)
@@ -657,7 +657,7 @@ function wireDashboardSwitcher() {
 
     if (!isOpen) {
       try {
-        const res = await fetch('/api/dashboards');
+        const res = await fetch('api/dashboards');
         const data = await res.json();
         chartEngine._dashboards = Array.isArray(data) ? data : (data.dashboards || []);
       } catch (err) {
@@ -699,7 +699,7 @@ function wireDashboardSwitcher() {
           await chartEngine.switchDashboard(id);
           nameInput.value = chartEngine._activeDashboardName;
           try {
-            const res = await fetch('/api/dashboards');
+            const res = await fetch('api/dashboards');
             const data = await res.json();
             chartEngine._dashboards = Array.isArray(data) ? data : (data.dashboards || []);
           } catch (err) { /* ignore */ }
@@ -931,7 +931,7 @@ function runExport(format) {
 
 // Simple user management modal for admins
 async function showUserManagement() {
-  const res = await fetch('/api/auth/users');
+  const res = await fetch('api/auth/users');
   const data = await res.json();
   if (!data.ok) return;
 
@@ -973,7 +973,7 @@ async function showUserManagement() {
     const role = $('newRole').value;
     if (!username || !password) return alert('Username and password required');
 
-    const res = await fetch('/api/auth/register', {
+    const res = await fetch('api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password, displayName: displayName || username, role })
