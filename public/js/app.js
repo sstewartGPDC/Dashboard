@@ -108,6 +108,17 @@ function circuitRowToMetrics(row) {
       rolloverCases: row.conflict_rollover_cases || 0,
       totalContractors: row.total_contractors || 0,
     },
+    capitalCases: row.capital_cases || 0,
+    felonyCases: row.felony_cases || 0,
+    misdemeanorCases: row.misdemeanor_cases || 0,
+    juvenileCases: row.juvenile_cases || 0,
+    appealsCases: row.appeals_cases || 0,
+    probationCases: row.probation_cases || 0,
+    investigators: row.investigators || 0,
+    socialWorkers: row.social_workers || 0,
+    paralegals: row.paralegals || 0,
+    annualBudget: row.annual_budget || 0,
+    actualSpend: row.actual_spend || 0,
   };
 }
 

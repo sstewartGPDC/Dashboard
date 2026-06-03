@@ -4,19 +4,28 @@
 function gpdcDataRows() {
   const headers = ['Circuit', 'Total Cases', 'New Cases', 'Closed Cases',
     'State Attorneys (Filled)', 'State Attorneys (Vacant)', 'County Attorneys',
-    'Conflict New Cases', 'Contractors', 'Caseload / Attorney', 'Vacancy Rate %'];
+    'Conflict New Cases', 'Contractors',
+    'Capital Cases', 'Felony Cases', 'Misdemeanor Cases', 'Juvenile Cases', 'Appeals', 'Probation Cases',
+    'Investigators', 'Social Workers', 'Paralegals', 'Annual Budget', 'Actual Spend',
+    'Caseload / Attorney', 'Weighted Caseload / Attorney', 'Vacancy Rate %', 'Cost per Case'];
   const rows = [headers];
+  const wc = (typeof weightedCaseCount === 'function') ? weightedCaseCount : () => 0;
   CIRCUITS.forEach((c) => {
     const m = CIRCUIT_METRICS.get(c.circuit);
     if (!m) return;
     const att = m.stateFilled + m.countyAttorneys;
     const caseload = att > 0 ? Number((m.totalCases / att).toFixed(1)) : 0;
+    const wCaseload = att > 0 ? Number((wc(m) / att).toFixed(1)) : 0;
     const vt = m.stateFilled + m.stateVacant;
     const vac = vt > 0 ? Number(((m.stateVacant / vt) * 100).toFixed(1)) : 0;
+    const cpc = m.totalCases > 0 ? Number(((m.actualSpend || 0) / m.totalCases).toFixed(0)) : 0;
     rows.push([
       c.circuit, m.totalCases, m.newCases, m.closed,
       m.stateFilled, m.stateVacant, m.countyAttorneys,
-      m.conflict.newCases, m.conflict.totalContractors, caseload, vac,
+      m.conflict.newCases, m.conflict.totalContractors,
+      m.capitalCases || 0, m.felonyCases || 0, m.misdemeanorCases || 0, m.juvenileCases || 0, m.appealsCases || 0, m.probationCases || 0,
+      m.investigators || 0, m.socialWorkers || 0, m.paralegals || 0, m.annualBudget || 0, m.actualSpend || 0,
+      caseload, wCaseload, vac, cpc,
     ]);
   });
   return rows;

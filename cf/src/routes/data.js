@@ -14,8 +14,8 @@ const data = new Hono();
 
 const TEMP_TTL = 3600; // seconds
 const INSERT_CIRCUIT =
-  `INSERT INTO circuit_data (upload_id, circuit, total_cases, new_cases, rollover_cases, closed_cases, state_attorneys_filled, state_attorneys_vacant, county_attorneys, conflict_new_cases, conflict_rollover_cases, total_contractors)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  `INSERT INTO circuit_data (upload_id, circuit, total_cases, new_cases, rollover_cases, closed_cases, state_attorneys_filled, state_attorneys_vacant, county_attorneys, conflict_new_cases, conflict_rollover_cases, total_contractors, capital_cases, felony_cases, misdemeanor_cases, juvenile_cases, appeals_cases, probation_cases, investigators, social_workers, paralegals, annual_budget, actual_spend)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 function xlsxResponse(bytes, filename) {
   return new Response(bytes, {
@@ -45,7 +45,11 @@ async function persistUpload(db, { userId, filename, isShared, rows, fiscalYear,
       INSERT_CIRCUIT,
       [uploadId, r.circuit, r.total_cases, r.new_cases, r.rollover_cases, r.closed_cases,
        r.state_attorneys_filled, r.state_attorneys_vacant, r.county_attorneys,
-       r.conflict_new_cases, r.conflict_rollover_cases, r.total_contractors],
+       r.conflict_new_cases, r.conflict_rollover_cases, r.total_contractors,
+       r.capital_cases || 0, r.felony_cases || 0, r.misdemeanor_cases || 0,
+       r.juvenile_cases || 0, r.appeals_cases || 0, r.probation_cases || 0,
+       r.investigators || 0, r.social_workers || 0, r.paralegals || 0,
+       r.annual_budget || 0, r.actual_spend || 0],
     ])
   );
   return uploadId;

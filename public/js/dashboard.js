@@ -28,7 +28,12 @@ function circuitMatchesSearch(c) { const q = ui.q.trim().toLowerCase(); return !
 function getFilteredCircuits() { return CIRCUITS.filter(c => (ui.circuit === "All" || c.circuit === ui.circuit) && (ui.county === "All" || c.counties.includes(ui.county)) && circuitMatchesSearch(c)); }
 
 function aggregateMetricsFrom(map, filteredCircuits) {
-  const agg = { totalCases: 0, newCases: 0, closed: 0, stateFilled: 0, stateVacant: 0, countyAttorneys: 0, conflict: { newCases: 0, totalContractors: 0 } };
+  const agg = {
+    totalCases: 0, newCases: 0, closed: 0, stateFilled: 0, stateVacant: 0, countyAttorneys: 0,
+    conflict: { newCases: 0, totalContractors: 0 },
+    capitalCases: 0, felonyCases: 0, misdemeanorCases: 0, juvenileCases: 0, appealsCases: 0, probationCases: 0,
+    investigators: 0, socialWorkers: 0, paralegals: 0, annualBudget: 0, actualSpend: 0,
+  };
   for (const c of filteredCircuits) {
     const m = map && map.get(c.circuit);
     if (!m) continue;
@@ -37,6 +42,12 @@ function aggregateMetricsFrom(map, filteredCircuits) {
     agg.countyAttorneys += m.countyAttorneys;
     agg.conflict.newCases += m.conflict.newCases;
     agg.conflict.totalContractors += m.conflict.totalContractors;
+    agg.capitalCases += m.capitalCases || 0; agg.felonyCases += m.felonyCases || 0;
+    agg.misdemeanorCases += m.misdemeanorCases || 0; agg.juvenileCases += m.juvenileCases || 0;
+    agg.appealsCases += m.appealsCases || 0; agg.probationCases += m.probationCases || 0;
+    agg.investigators += m.investigators || 0; agg.socialWorkers += m.socialWorkers || 0;
+    agg.paralegals += m.paralegals || 0;
+    agg.annualBudget += m.annualBudget || 0; agg.actualSpend += m.actualSpend || 0;
   }
   return agg;
 }

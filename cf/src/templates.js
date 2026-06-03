@@ -47,20 +47,19 @@ function toBytes(wb) {
 export function buildFullTemplate() {
   const headers = ['Circuit','Total Cases','New Cases','Rollover Cases','Closed Cases',
     'State Attorneys (Filled)','State Attorneys (Vacant)','County Attorneys',
-    'New Conflict Cases','Rollover Conflict Cases','Total Contractors'];
+    'New Conflict Cases','Rollover Conflict Cases','Total Contractors',
+    'Capital Cases','Felony Cases','Misdemeanor Cases','Juvenile Cases','Appeals','Probation Cases',
+    'Investigators','Social Workers','Paralegals','Annual Budget','Actual Spend'];
 
   const dataRows = [headers];
-  dataRows.push(['Atlanta', 4200, 1100, 3100, 850, 45, 5, 12, 380, 200, 8]);
-  dataRows.push(['Augusta', 1800, 520, 1280, 410, 18, 2, 6, 140, 80, 4]);
+  dataRows.push(['Atlanta', 4200, 1100, 3100, 850, 45, 5, 12, 380, 200, 8, 6, 1800, 1900, 420, 80, 1000, 12, 6, 18, 9500000, 9200000]);
+  dataRows.push(['Augusta', 1800, 520, 1280, 410, 18, 2, 6, 140, 80, 4, 2, 760, 820, 160, 30, 420, 5, 2, 7, 4100000, 3950000]);
   CIRCUITS.forEach((c) => {
-    if (c !== 'Atlanta' && c !== 'Augusta') dataRows.push([c, '', '', '', '', '', '', '', '', '', '']);
+    if (c !== 'Atlanta' && c !== 'Augusta') dataRows.push([c, ...Array(headers.length - 1).fill('')]);
   });
 
   const ws1 = XLSX.utils.aoa_to_sheet(dataRows);
-  ws1['!cols'] = [
-    { wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 14 },
-    { wch: 24 }, { wch: 24 }, { wch: 18 }, { wch: 20 }, { wch: 24 }, { wch: 18 },
-  ];
+  ws1['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 3, 12) }));
 
   const guideRows = [
     ['Column Name', 'Description', 'Required?', 'Example Values'],
@@ -76,10 +75,28 @@ export function buildFullTemplate() {
     ['Rollover Conflict Cases', 'Conflict Division cases from prior period', 'No', '200, 80'],
     ['Total Contractors', 'Contract attorneys (CP and C3)', 'No', '8, 4'],
     [],
+    ['CASE TYPES — used for weighted caseload vs. standard'],
+    ['Capital Cases', 'Death-penalty cases (highest weight)', 'No', '6, 2'],
+    ['Felony Cases', 'Felony cases', 'No', '1800, 760'],
+    ['Misdemeanor Cases', 'Misdemeanor cases', 'No', '1900, 820'],
+    ['Juvenile Cases', 'Juvenile delinquency cases', 'No', '420, 160'],
+    ['Appeals', 'Appellate cases', 'No', '80, 30'],
+    ['Probation Cases', 'Probation / revocation cases', 'No', '1000, 420'],
+    [],
+    ['SUPPORT STAFF'],
+    ['Investigators', 'Investigator FTEs', 'No', '12, 5'],
+    ['Social Workers', 'Social workers / mitigation specialists', 'No', '6, 2'],
+    ['Paralegals', 'Paralegal FTEs', 'No', '18, 7'],
+    [],
+    ['FINANCIALS'],
+    ['Annual Budget', 'Annual budget for the circuit (dollars)', 'No', '9500000'],
+    ['Actual Spend', 'Actual expenditures (dollars)', 'No', '9200000'],
+    [],
     ['NOTES'],
     ['Only the "Circuit" column is required. Include whichever columns are relevant to your team.'],
     ['Column names do not need to match exactly — the dashboard will let you map them during upload.'],
     ['You can rename, reorder, or remove any optional columns.'],
+    ['Case-type columns enable weighted caseload; support-staff and financial columns enable staffing ratios and cost-per-case.'],
   ];
   const ws2 = XLSX.utils.aoa_to_sheet(guideRows);
   ws2['!cols'] = [{ wch: 28 }, { wch: 52 }, { wch: 12 }, { wch: 28 }];

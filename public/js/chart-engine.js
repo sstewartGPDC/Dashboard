@@ -22,6 +22,28 @@ const CHART_FIELDS = {
   caseload:            { label: 'Caseload / Attorney', group: 'Computed', getAgg: a => { const t = a.stateFilled + a.countyAttorneys; return t > 0 ? a.totalCases / t : 0; }, getCircuit: m => { const t = m.stateFilled + m.countyAttorneys; return t > 0 ? m.totalCases / t : 0; } },
   vacancyRate:         { label: 'Vacancy Rate',       group: 'Computed',  getAgg: a => { const t = a.stateFilled + a.stateVacant; return t > 0 ? a.stateVacant / t : 0; }, getCircuit: m => { const t = m.stateFilled + m.stateVacant; return t > 0 ? m.stateVacant / t : 0; } },
   activeRemaining:     { label: 'Active Remaining',   group: 'Computed',  getAgg: a => Math.max(a.totalCases - a.newCases, 0), getCircuit: m => Math.max(m.totalCases - m.newCases, 0) },
+
+  // Case types
+  capitalCases:        { label: 'Capital Cases',      group: 'Case Types', getAgg: a => a.capitalCases || 0,     getCircuit: m => m.capitalCases || 0 },
+  felonyCases:         { label: 'Felony Cases',        group: 'Case Types', getAgg: a => a.felonyCases || 0,      getCircuit: m => m.felonyCases || 0 },
+  misdemeanorCases:    { label: 'Misdemeanor Cases',   group: 'Case Types', getAgg: a => a.misdemeanorCases || 0, getCircuit: m => m.misdemeanorCases || 0 },
+  juvenileCases:       { label: 'Juvenile Cases',      group: 'Case Types', getAgg: a => a.juvenileCases || 0,    getCircuit: m => m.juvenileCases || 0 },
+  appealsCases:        { label: 'Appeals',             group: 'Case Types', getAgg: a => a.appealsCases || 0,     getCircuit: m => m.appealsCases || 0 },
+  probationCases:      { label: 'Probation Cases',     group: 'Case Types', getAgg: a => a.probationCases || 0,   getCircuit: m => m.probationCases || 0 },
+
+  // Support staff
+  investigators:       { label: 'Investigators',       group: 'Support',   getAgg: a => a.investigators || 0,    getCircuit: m => m.investigators || 0 },
+  socialWorkers:       { label: 'Social Workers',      group: 'Support',   getAgg: a => a.socialWorkers || 0,    getCircuit: m => m.socialWorkers || 0 },
+  paralegals:          { label: 'Paralegals',          group: 'Support',   getAgg: a => a.paralegals || 0,       getCircuit: m => m.paralegals || 0 },
+  supportRatio:        { label: 'Support per Attorney', group: 'Support',  getAgg: a => { const t = a.stateFilled + a.countyAttorneys; return t > 0 ? ((a.investigators || 0) + (a.socialWorkers || 0) + (a.paralegals || 0)) / t : 0; }, getCircuit: m => { const t = m.stateFilled + m.countyAttorneys; return t > 0 ? ((m.investigators || 0) + (m.socialWorkers || 0) + (m.paralegals || 0)) / t : 0; } },
+
+  // Financials
+  annualBudget:        { label: 'Annual Budget',       group: 'Financials', getAgg: a => a.annualBudget || 0,    getCircuit: m => m.annualBudget || 0 },
+  actualSpend:         { label: 'Actual Spend',        group: 'Financials', getAgg: a => a.actualSpend || 0,     getCircuit: m => m.actualSpend || 0 },
+  costPerCase:         { label: 'Cost per Case',       group: 'Financials', getAgg: a => a.totalCases > 0 ? (a.actualSpend || 0) / a.totalCases : 0, getCircuit: m => m.totalCases > 0 ? (m.actualSpend || 0) / m.totalCases : 0 },
+
+  // Weighted caseload (uses CASE_WEIGHTS from data.js)
+  weightedCaseload:    { label: 'Weighted Caseload / Attorney', group: 'Computed', getAgg: a => { const t = a.stateFilled + a.countyAttorneys; return t > 0 ? weightedCaseCount(a) / t : 0; }, getCircuit: m => { const t = m.stateFilled + m.countyAttorneys; return t > 0 ? weightedCaseCount(m) / t : 0; } },
 };
 
 // Color palette for charts
@@ -893,8 +915,12 @@ const chartEngine = {
     }
 
     if (config.type === 'scorecard') {
-      html += '<div class="editor-row"><label>Standard (cases / attorney)</label><input type="number" min="1" step="1" data-edit="standard" value="' + (Number(config.standard) || 150) + '"></div>';
-      html += '<div class="editor-row"><div class="editor-hint">Circuits above this caseload are flagged red. Set to your agency&rsquo;s adopted maximum.</div></div>';
+      html += '<div class="editor-row"><label>Caseload Type</label><select data-edit="weighted">';
+      html += '<option value=""' + (!config.weighted ? ' selected' : '') + '>Raw (cases / attorney)</option>';
+      html += '<option value="1"' + (config.weighted ? ' selected' : '') + '>Weighted (by case type)</option>';
+      html += '</select></div>';
+      html += '<div class="editor-row"><label>Standard (max / attorney)</label><input type="number" min="1" step="1" data-edit="standard" value="' + (Number(config.standard) || (config.weighted ? 400 : 150)) + '"></div>';
+      html += '<div class="editor-row"><div class="editor-hint">Circuits above this caseload are flagged red. Weighted mode uses case-type counts &times; weights; set the standard to your agency&rsquo;s adopted maximum.</div></div>';
     }
 
     // Reset overrides button for segment charts

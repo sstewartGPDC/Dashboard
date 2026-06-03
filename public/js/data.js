@@ -72,7 +72,33 @@ let CIRCUIT_METRICS_PRIOR = new Map();
 let __hasData = false;
 
 function emptyMetrics() {
-  return { totalCases: 0, newCases: 0, closed: 0, stateFilled: 0, stateVacant: 0, countyAttorneys: 0, conflict: { newCases: 0, rolloverCases: 0, totalContractors: 0 } };
+  return {
+    totalCases: 0, newCases: 0, closed: 0,
+    stateFilled: 0, stateVacant: 0, countyAttorneys: 0,
+    conflict: { newCases: 0, rolloverCases: 0, totalContractors: 0 },
+    // Case types (weighted caseload)
+    capitalCases: 0, felonyCases: 0, misdemeanorCases: 0, juvenileCases: 0, appealsCases: 0, probationCases: 0,
+    // Support staff
+    investigators: 0, socialWorkers: 0, paralegals: 0,
+    // Financials
+    annualBudget: 0, actualSpend: 0,
+  };
+}
+
+// Default case weights for weighted caseload — relative to a misdemeanor (1.0).
+// PLACEHOLDERS: replace with your agency's adopted standard (e.g. the 2023
+// National Public Defense Workload Study hours-per-case figures).
+const CASE_WEIGHTS = { capital: 40, felony: 4, misdemeanor: 1, juvenile: 2, appeals: 8, probation: 0.5 };
+
+// Weighted case count for a metrics-or-aggregate object.
+function weightedCaseCount(m) {
+  if (!m) return 0;
+  return (m.capitalCases || 0) * CASE_WEIGHTS.capital
+    + (m.felonyCases || 0) * CASE_WEIGHTS.felony
+    + (m.misdemeanorCases || 0) * CASE_WEIGHTS.misdemeanor
+    + (m.juvenileCases || 0) * CASE_WEIGHTS.juvenile
+    + (m.appealsCases || 0) * CASE_WEIGHTS.appeals
+    + (m.probationCases || 0) * CASE_WEIGHTS.probation;
 }
 
 function initEmptyMetrics() {

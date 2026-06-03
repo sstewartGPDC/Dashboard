@@ -17,8 +17,29 @@ export const DEFAULT_MAPPINGS = {
   county_attorneys: ['County Attorneys', 'county_attorneys'],
   conflict_new_cases: ['New Conflict Cases', 'Conflict New Cases', 'conflict_new_cases'],
   conflict_rollover_cases: ['Rollover Conflict Cases', 'rollover_conflict_cases'],
-  total_contractors: ['Total C2 Contractors', 'Total Contractors (CP and C3)', 'total_contractors'],
+  total_contractors: ['Total C2 Contractors', 'Total Contractors (CP and C3)', 'Total Contractors', 'total_contractors'],
+  // Case-type breakdown (weighted caseload)
+  capital_cases: ['Capital Cases', 'Death Penalty Cases', 'capital_cases'],
+  felony_cases: ['Felony Cases', 'Felonies', 'felony_cases'],
+  misdemeanor_cases: ['Misdemeanor Cases', 'Misdemeanors', 'misdemeanor_cases'],
+  juvenile_cases: ['Juvenile Cases', 'Juvenile', 'juvenile_cases'],
+  appeals_cases: ['Appeals', 'Appellate Cases', 'Appeals Cases', 'appeals_cases'],
+  probation_cases: ['Probation Cases', 'Probation/Revocation Cases', 'Revocations', 'probation_cases'],
+  // Support staff
+  investigators: ['Investigators', 'investigators'],
+  social_workers: ['Social Workers', 'Mitigation Specialists', 'social_workers'],
+  paralegals: ['Paralegals', 'paralegals'],
+  // Financials
+  annual_budget: ['Annual Budget', 'Budget', 'annual_budget'],
+  actual_spend: ['Actual Spend', 'Expenditures', 'Spend', 'actual_spend'],
 };
+
+// Numeric parse that tolerates "$1,234.56" style budget figures.
+function num(v) {
+  if (v == null || v === '') return 0;
+  const n = parseFloat(String(v).replace(/[$,]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
 
 function getField(row, fieldName, customMapping) {
   if (customMapping && customMapping[fieldName]) {
@@ -83,6 +104,17 @@ export function parseExcelBytes(bytes, customMapping = {}) {
       conflict_new_cases: parseInt(getField(row, 'conflict_new_cases', customMapping)) || 0,
       conflict_rollover_cases: parseInt(getField(row, 'conflict_rollover_cases', customMapping)) || 0,
       total_contractors: parseInt(getField(row, 'total_contractors', customMapping)) || 0,
+      capital_cases: num(getField(row, 'capital_cases', customMapping)),
+      felony_cases: num(getField(row, 'felony_cases', customMapping)),
+      misdemeanor_cases: num(getField(row, 'misdemeanor_cases', customMapping)),
+      juvenile_cases: num(getField(row, 'juvenile_cases', customMapping)),
+      appeals_cases: num(getField(row, 'appeals_cases', customMapping)),
+      probation_cases: num(getField(row, 'probation_cases', customMapping)),
+      investigators: num(getField(row, 'investigators', customMapping)),
+      social_workers: num(getField(row, 'social_workers', customMapping)),
+      paralegals: num(getField(row, 'paralegals', customMapping)),
+      annual_budget: num(getField(row, 'annual_budget', customMapping)),
+      actual_spend: num(getField(row, 'actual_spend', customMapping)),
     });
   }
 

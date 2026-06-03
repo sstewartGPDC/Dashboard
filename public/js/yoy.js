@@ -90,30 +90,41 @@ function yoyFyLabel(fy) {
 // ─── Circuit Scorecard ───────────────────────────────────────────────
 // Per-circuit caseload vs a configurable standard, benchmark-colored, with an
 // optional year-over-year column. The headline metric for external reporting.
-function scorecardRows() {
+function scorecardRows(weighted) {
   const fc = getFilteredCircuits();
   const priorOn = !!window.__compareFY && typeof CIRCUIT_METRICS_PRIOR !== 'undefined' && CIRCUIT_METRICS_PRIOR.size;
+  const wcount = (typeof weightedCaseCount === 'function') ? weightedCaseCount : () => 0;
   return fc.map((c) => {
     const m = CIRCUIT_METRICS.get(c.circuit) || emptyMetrics();
     const att = m.stateFilled + m.countyAttorneys;
-    const caseload = att > 0 ? m.totalCases / att : 0;
+    const cases = weighted ? wcount(m) : m.totalCases;
+    const caseload = att > 0 ? cases / att : 0;
     let priorCaseload = null;
     if (priorOn) {
       const pm = CIRCUIT_METRICS_PRIOR.get(c.circuit);
-      if (pm) { const pa = pm.stateFilled + pm.countyAttorneys; priorCaseload = pa > 0 ? pm.totalCases / pa : null; }
+      if (pm) {
+        const pa = pm.stateFilled + pm.countyAttorneys;
+        const pcases = weighted ? wcount(pm) : pm.totalCases;
+        priorCaseload = pa > 0 ? pcases / pa : null;
+      }
     }
-    return { circuit: c.circuit, cases: m.totalCases, attorneys: att, caseload, priorCaseload };
+    return { circuit: c.circuit, cases, attorneys: att, caseload, priorCaseload };
   }).filter((r) => r.attorneys > 0 || r.cases > 0);
 }
 
 function renderScorecard(bodyId, config) {
   const el = document.getElementById(bodyId);
   if (!el) return;
-  const std = Number(config.standard) > 0 ? Number(config.standard) : 150;
-  const rows = scorecardRows().sort((a, b) => b.caseload - a.caseload);
+  const weighted = !!config.weighted;
+  const defaultStd = weighted ? 400 : 150;
+  const std = Number(config.standard) > 0 ? Number(config.standard) : defaultStd;
+  const rows = scorecardRows(weighted).sort((a, b) => b.caseload - a.caseload);
   if (!rows.length) { el.innerHTML = '<div class="empty-state">No circuit data. Upload data to populate the scorecard.</div>'; return; }
   const over = rows.filter((r) => r.caseload > std).length;
   const compareOn = !!window.__compareFY && typeof CIRCUIT_METRICS_PRIOR !== 'undefined' && CIRCUIT_METRICS_PRIOR.size;
+  const caseHdr = weighted ? 'Wtd Cases' : 'Cases';
+  const loadHdr = weighted ? 'Wtd Caseload' : 'Caseload';
+  const unit = weighted ? 'weighted units / attorney' : 'cases / attorney';
 
   const body = rows.map((r) => {
     const ratio = std > 0 ? r.caseload / std : 0;
@@ -124,7 +135,7 @@ function renderScorecard(bodyId, config) {
       : '';
     return `<tr>
       <td class="sc-circuit">${r.circuit}</td>
-      <td>${fmt(r.cases)}</td>
+      <td>${fmt(Math.round(r.cases))}</td>
       <td>${fmt(r.attorneys)}</td>
       <td class="sc-caseload ${cls}">${r.caseload.toFixed(1)} ${flag}</td>
       <td class="sc-bar"><div class="sc-bar-track"><div class="sc-bar-fill ${cls}" style="width:${Math.min(ratio * 100, 100).toFixed(0)}%"></div></div></td>
@@ -133,9 +144,9 @@ function renderScorecard(bodyId, config) {
   }).join('');
 
   el.innerHTML = `
-    <div class="sc-summary"><span class="sc-summary-num ${over > 0 ? 'sc-over' : 'sc-ok'}">${over}</span> of ${rows.length} circuits over the standard of ${fmt(std)} cases / attorney</div>
+    <div class="sc-summary"><span class="sc-summary-num ${over > 0 ? 'sc-over' : 'sc-ok'}">${over}</span> of ${rows.length} circuits over the standard of ${fmt(std)} ${unit}${weighted ? '' : ''}</div>
     <div class="sc-table-wrap"><table class="sc-table">
-      <thead><tr><th>Circuit</th><th>Cases</th><th>Attys</th><th>Caseload</th><th>vs Standard</th>${compareOn ? '<th>YoY</th>' : ''}</tr></thead>
+      <thead><tr><th>Circuit</th><th>${caseHdr}</th><th>Attys</th><th>${loadHdr}</th><th>vs Standard</th>${compareOn ? '<th>YoY</th>' : ''}</tr></thead>
       <tbody>${body}</tbody>
     </table></div>`;
 }

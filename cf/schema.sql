@@ -40,7 +40,21 @@ CREATE TABLE IF NOT EXISTS circuit_data (
   county_attorneys INTEGER DEFAULT 0,
   conflict_new_cases INTEGER DEFAULT 0,
   conflict_rollover_cases INTEGER DEFAULT 0,
-  total_contractors INTEGER DEFAULT 0
+  total_contractors INTEGER DEFAULT 0,
+  -- Case-type breakdown (for weighted caseload vs. standard)
+  capital_cases INTEGER DEFAULT 0,
+  felony_cases INTEGER DEFAULT 0,
+  misdemeanor_cases INTEGER DEFAULT 0,
+  juvenile_cases INTEGER DEFAULT 0,
+  appeals_cases INTEGER DEFAULT 0,
+  probation_cases INTEGER DEFAULT 0,
+  -- Support staff
+  investigators INTEGER DEFAULT 0,
+  social_workers INTEGER DEFAULT 0,
+  paralegals INTEGER DEFAULT 0,
+  -- Financials
+  annual_budget REAL DEFAULT 0,
+  actual_spend REAL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_circuit_upload ON circuit_data(upload_id);
 
