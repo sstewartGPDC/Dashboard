@@ -343,6 +343,17 @@ async function initApp() {
         manageBtn.addEventListener('click', showUserManagement);
       }
     }
+
+    // Read-only viewers: lock the UI and hide all editing entry points. Data
+    // writes are also blocked server-side (requireEditor).
+    if (data.user.role === 'viewer') {
+      document.body.classList.add('role-viewer');
+      if (typeof chartEngine !== 'undefined') chartEngine.locked = true;
+      const tabUpload = $('tabUpload');
+      if (tabUpload) tabUpload.style.display = 'none';
+      const lockBtn = $('lockToggleBtn');
+      if (lockBtn) lockBtn.style.display = 'none';
+    }
   } catch (err) {
     console.error('Auth check failed:', err);
     window.location.href = 'login.html';

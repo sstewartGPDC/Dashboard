@@ -38,3 +38,8 @@ ADMIN_EMAILS = "dev@local, sstewart@gapubdef.org"
 # Sub-path the app is mounted under. The Worker strips this prefix before
 # routing; the frontend resolves relative URLs via a <base> tag. Empty = root.
 BASE_PATH = "/intranet/apps/dashboards"
+# Roles: admin (ADMIN_EMAILS) > editor (default) > viewer (read-only).
+# Set VIEWER_EMAILS for read-only users; set DEFAULT_ROLE="viewer" to make
+# everyone read-only unless explicitly granted admin/editor.
+# VIEWER_EMAILS = ""
+# DEFAULT_ROLE = "editor"

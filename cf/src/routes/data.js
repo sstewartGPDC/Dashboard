@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import { parseExcelBytes, getHeaderBytes, DEFAULT_MAPPINGS } from '../parse.js';
 import { buildFullTemplate, buildDashboardTemplate } from '../templates.js';
 import { audit } from '../audit.js';
+import { requireEditor } from '../access.js';
 
 const data = new Hono();
 
@@ -143,7 +144,7 @@ data.get('/periods', async (c) => {
 });
 
 // POST /api/data/preview-headers — multipart; stash bytes in KV, return headers
-data.post('/preview-headers', async (c) => {
+data.post('/preview-headers', requireEditor(), async (c) => {
   const form = await c.req.formData();
   const file = form.get('file');
   if (!file || typeof file === 'string') return c.json({ ok: false, error: 'No file uploaded' }, 400);
@@ -162,7 +163,7 @@ data.post('/preview-headers', async (c) => {
 });
 
 // POST /api/data/upload-mapped — read KV bytes, parse with mapping, insert
-data.post('/upload-mapped', async (c) => {
+data.post('/upload-mapped', requireEditor(), async (c) => {
   const { tempFile, mapping, shared, fiscalYear, period } = await c.req.json().catch(() => ({}));
   if (!tempFile) return c.json({ ok: false, error: 'No temp file specified' }, 400);
 
@@ -212,7 +213,7 @@ data.get('/column-mappings', async (c) => {
 });
 
 // POST /api/data/column-mappings
-data.post('/column-mappings', async (c) => {
+data.post('/column-mappings', requireEditor(), async (c) => {
   const { name, mapping } = await c.req.json().catch(() => ({}));
   if (!mapping) return c.json({ ok: false, error: 'Mapping required' }, 400);
   const db = c.get('db');
@@ -243,7 +244,7 @@ data.get('/config/:key', async (c) => {
 });
 
 // POST /api/data/config
-data.post('/config', async (c) => {
+data.post('/config', requireEditor(), async (c) => {
   const { key, value } = await c.req.json().catch(() => ({}));
   if (!key) return c.json({ ok: false, error: 'Config key required' }, 400);
   const db = c.get('db');
@@ -255,7 +256,7 @@ data.post('/config', async (c) => {
 });
 
 // DELETE /api/data/clear
-data.delete('/clear', async (c) => {
+data.delete('/clear', requireEditor(), async (c) => {
   const db = c.get('db');
   const user = c.get('user');
 
