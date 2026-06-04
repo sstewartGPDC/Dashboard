@@ -66,6 +66,7 @@ function cbRenderBuilderList() {
         <div class="cb-tpl-meta">${(t.fields || []).length} fields · ${t.cadence}${t.owner_role ? ' · ' + t.owner_role : ''}</div>
       </div>
       <div class="cb-tpl-actions">
+        <button class="cb-btn-sm" data-status="${t.id}">Status</button>
         <button class="cb-btn-sm" data-edit="${t.id}">Edit</button>
         <button class="cb-btn-sm cb-danger" data-del="${t.id}">Delete</button>
       </div>
@@ -74,6 +75,7 @@ function cbRenderBuilderList() {
     <button class="cb-btn-primary" id="cbNewBtn">+ New Template</button>`;
   body.querySelector('#cbNewBtn').addEventListener('click', () => cbShowForm(null));
   body.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => cbShowForm(__collectTemplates.find((t) => String(t.id) === b.dataset.edit))));
+  body.querySelectorAll('[data-status]').forEach((b) => b.addEventListener('click', () => cbShowStatus(__collectTemplates.find((t) => String(t.id) === b.dataset.status))));
   body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
     if (!confirm('Delete this template?')) return;
     await fetch('api/templates/' + b.dataset.del, { method: 'DELETE' });
@@ -226,4 +228,57 @@ async function cbSubmit(m) {
   } catch (e) {
     alert('Submit failed: ' + e.message); btn.disabled = false; btn.textContent = 'Submit';
   }
+}
+
+// ── Collection status board ──────────────────────────────────────────
+function cbShowStatus(tpl) {
+  if (!tpl) return;
+  const m = _cbModal(`<div class="tpl-modal cb-modal cb-modal-wide">
+    <div class="tpl-modal-head">
+      <div><div class="tpl-modal-title">${tpl.name} — Status</div>
+      <div class="tpl-modal-sub">Who has submitted, and who's outstanding.</div></div>
+      <button class="tpl-modal-close" id="stClose">&times;</button>
+    </div>
+    <div class="cb-sf-controls">
+      <div><label>Fiscal year</label><input id="stFY" type="number" value="${_cbCurrentFY()}" style="width:90px"></div>
+      <div><label>Period</label><select id="stPeriod">${cbPeriodOptions(tpl.cadence).map((p) => `<option value="${p}">${p === 'annual' ? 'Annual' : p}</option>`).join('')}</select></div>
+    </div>
+    <div id="stBody" style="padding:0 1.5rem 1.5rem"></div>
+  </div>`, 'cbStatusModal');
+  m.querySelector('#stClose').addEventListener('click', () => m.remove());
+  const refresh = () => cbRenderStatus(tpl);
+  m.querySelector('#stFY').addEventListener('change', refresh);
+  m.querySelector('#stPeriod').addEventListener('change', refresh);
+  refresh();
+}
+
+async function cbRenderStatus(tpl) {
+  const m = document.getElementById('cbStatusModal');
+  if (!m) return;
+  const body = m.querySelector('#stBody');
+  const fy = m.querySelector('#stFY').value;
+  const period = m.querySelector('#stPeriod').value;
+  body.innerHTML = '<div class="cb-empty">Loading…</div>';
+  let d;
+  try {
+    const res = await fetch(`api/templates/${tpl.id}/status?fy=${fy}&period=${encodeURIComponent(period)}`);
+    d = await res.json();
+  } catch (e) { body.innerHTML = '<div class="cb-empty">Failed to load status.</div>'; return; }
+  if (!d.ok) { body.innerHTML = '<div class="cb-empty">' + (d.error || 'Failed') + '</div>'; return; }
+
+  const pct = d.expectedCount ? Math.round((d.submittedCount / d.expectedCount) * 100) : 0;
+  const submittedHtml = d.submitted.map((s) => `<div class="cb-st-row cb-st-done"><span class="cb-st-circ">✓ ${s.circuit}</span><span class="cb-st-by">${s.by || ''}</span></div>`).join('');
+  const outstandingHtml = d.outstanding.map((cir) => `<div class="cb-st-row cb-st-out"><span class="cb-st-circ">○ ${cir}</span></div>`).join('');
+  const recentHtml = (d.recent || []).map((r) => `<div class="cb-st-recent"><b>${r.email || 'someone'}</b> · ${r.count} circuit(s) · ${(r.at || '').replace('T', ' ').slice(0, 16)}</div>`).join('') || '<div class="cb-empty" style="text-align:left;padding:0.4rem 0">No submissions yet for this period.</div>';
+
+  body.innerHTML = `
+    <div class="cb-st-summary">
+      <div class="cb-st-bignum">${d.submittedCount} <span>of ${d.expectedCount} submitted</span></div>
+      <div class="cb-st-bar"><div class="cb-st-bar-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="cb-st-cols">
+      <div><div class="cb-st-col-title">Submitted (${d.submitted.length})</div><div class="cb-st-list">${submittedHtml || '<div class="cb-empty" style="padding:0.4rem 0">None yet.</div>'}</div></div>
+      <div><div class="cb-st-col-title">Outstanding (${d.outstanding.length})</div><div class="cb-st-list">${outstandingHtml || '<div class="cb-empty" style="padding:0.4rem 0">All in.</div>'}</div></div>
+    </div>
+    <div class="cb-st-recent-wrap"><div class="cb-st-col-title">Recent submissions</div>${recentHtml}</div>`;
 }

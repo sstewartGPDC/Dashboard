@@ -76,11 +76,11 @@ async function mergeRows(db, datasetId, fields, rows) {
   return rows.length;
 }
 
-async function logSubmission(c, db, { datasetId, templateId, fields, rowCount }) {
+async function logSubmission(c, db, { datasetId, templateId, fields, rowCount, circuits }) {
   const u = c.get('user') || {};
   await db.run(
-    'INSERT INTO submissions (dataset_id, template_id, user_id, email, fields, row_count) VALUES (?, ?, ?, ?, ?, ?)',
-    [datasetId, templateId || null, u.id || null, u.email || null, JSON.stringify(fields), rowCount]
+    'INSERT INTO submissions (dataset_id, template_id, user_id, email, fields, circuits, row_count) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [datasetId, templateId || null, u.id || null, u.email || null, JSON.stringify(fields), JSON.stringify(circuits || []), rowCount]
   );
 }
 
@@ -226,7 +226,7 @@ data.post('/upload-mapped', requireEditor(), async (c) => {
 
   const datasetId = await findOrCreateDataset(db, { userId: c.get('user').id, isShared, fiscalYear: fy, period: per });
   const merged = await mergeRows(db, datasetId, fields, rows);
-  await logSubmission(c, db, { datasetId, templateId, fields, rowCount: merged });
+  await logSubmission(c, db, { datasetId, templateId, fields, rowCount: merged, circuits: rows.map((r) => r.circuit) });
   await c.env.TEMP_UPLOADS.delete(key);
   await audit(c, 'data.upload', { datasetId, filename, rowCount: merged, fields, shared: isShared, fiscalYear: fy, period: per });
   return c.json({ ok: true, uploadId: datasetId, rowCount: merged, fields, source: isShared ? 'shared' : 'personal', fiscalYear: fy, period: per });
@@ -260,7 +260,7 @@ data.post('/submit', requireEditor(), async (c) => {
 
   const datasetId = await findOrCreateDataset(db, { userId: c.get('user').id, isShared, fiscalYear: fy, period: per });
   const merged = await mergeRows(db, datasetId, fields, rows);
-  await logSubmission(c, db, { datasetId, templateId: body.templateId, fields, rowCount: merged });
+  await logSubmission(c, db, { datasetId, templateId: body.templateId, fields, rowCount: merged, circuits: rows.map((r) => r.circuit) });
   await audit(c, 'data.submit', { datasetId, rowCount: merged, fields, shared: isShared, fiscalYear: fy, period: per });
   return c.json({ ok: true, datasetId, rowCount: merged, fields, source: isShared ? 'shared' : 'personal', fiscalYear: fy, period: per });
 });

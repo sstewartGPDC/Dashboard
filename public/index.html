@@ -1190,6 +1190,24 @@
         .cb-sf-table td.cb-sf-circ { font-weight:600; color:var(--text-dark,#1a1a1a); white-space:nowrap; padding-left:0.6rem; }
         .cb-sf-table input { width:90px; padding:0.3rem 0.4rem; border:1px solid var(--border-light,#e5e2dd); border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:0.8rem; }
         .cb-sf-table input:focus { outline:none; border-color:var(--primary,#B85C38); }
+
+        /* Collection status board */
+        .cb-st-summary { margin-bottom:1.1rem; }
+        .cb-st-bignum { font-family:'Ubuntu',sans-serif; font-weight:700; font-size:1.7rem; color:var(--text-dark,#1a1a1a); }
+        .cb-st-bignum span { font-size:0.9rem; font-weight:500; color:var(--text-light,#888); }
+        .cb-st-bar { height:10px; background:var(--border-light,#e5e2dd); border-radius:5px; overflow:hidden; margin-top:0.5rem; }
+        .cb-st-bar-fill { height:100%; background:var(--primary,#B85C38); border-radius:5px; transition:width .3s ease; }
+        .cb-st-cols { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.1rem; }
+        .cb-st-col-title { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-light,#6b6b6b); margin-bottom:0.4rem; }
+        .cb-st-list { max-height:38vh; overflow:auto; border:1px solid var(--border-light,#e5e2dd); border-radius:10px; }
+        .cb-st-row { display:flex; justify-content:space-between; align-items:center; padding:0.3rem 0.6rem; border-bottom:1px solid var(--border-light,#eee); font-size:0.82rem; }
+        .cb-st-circ { font-weight:500; }
+        .cb-st-done .cb-st-circ { color:#2e7d32; }
+        .cb-st-out .cb-st-circ { color:var(--text-light,#888); }
+        .cb-st-by { font-size:0.68rem; color:var(--text-light,#888); font-family:'JetBrains Mono',monospace; }
+        .cb-st-recent-wrap { border-top:1px solid var(--border-light,#e5e2dd); padding-top:0.8rem; }
+        .cb-st-recent { font-size:0.78rem; color:var(--text-medium,#4a4a4a); padding:0.2rem 0; }
+        @media (max-width:640px){ .cb-st-cols { grid-template-columns:1fr; } }
       </style>
     </div>
 

@@ -5,7 +5,7 @@
  */
 import { Hono } from 'hono';
 import { requireAdmin } from '../access.js';
-import { buildFieldsTemplate } from '../templates.js';
+import { buildFieldsTemplate, CIRCUITS } from '../templates.js';
 
 const templates = new Hono();
 
@@ -44,6 +44,52 @@ templates.get('/:id/xlsx', async (c) => {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="GPDC_${safe}_Template.xlsx"`,
     },
+  });
+});
+
+// GET /api/templates/:id/status?fy=&period= — submitted vs outstanding circuits
+templates.get('/:id/status', async (c) => {
+  const db = c.get('db');
+  const row = await db.get('SELECT * FROM templates WHERE id = ?', [c.req.param('id')]);
+  if (!row) return c.json({ ok: false, error: 'Template not found' }, 404);
+  const t = parseTemplate(row);
+
+  const fy = parseInt(c.req.query('fy'), 10) || null;
+  const period = c.req.query('period') || 'annual';
+
+  // The shared (canonical) dataset for this fy/period.
+  const dataset = await db.get(
+    'SELECT id FROM upload_history WHERE is_shared = 1 AND fiscal_year = ? AND period = ? ORDER BY uploaded_at DESC LIMIT 1',
+    [fy, period]
+  );
+
+  const submittedBy = {}; // circuit -> { by, at }
+  const recent = [];
+  if (dataset) {
+    const subs = await db.all(
+      'SELECT email, circuits, fields, submitted_at FROM submissions WHERE dataset_id = ? AND template_id = ? ORDER BY submitted_at',
+      [dataset.id, t.id]
+    );
+    for (const s of subs) {
+      let circuits = [];
+      try { circuits = JSON.parse(s.circuits || '[]'); } catch {}
+      circuits.forEach((circ) => { submittedBy[circ] = { by: s.email, at: s.submitted_at }; });
+      recent.push({ email: s.email, count: circuits.length, at: s.submitted_at });
+    }
+  }
+
+  const expected = t.scope === 'statewide' ? ['Statewide'] : CIRCUITS;
+  const submitted = expected.filter((cir) => submittedBy[cir]).map((cir) => ({ circuit: cir, ...submittedBy[cir] }));
+  const outstanding = expected.filter((cir) => !submittedBy[cir]);
+
+  return c.json({
+    ok: true,
+    template: { id: t.id, name: t.name, cadence: t.cadence, scope: t.scope, fields: t.fields },
+    fiscalYear: fy, period,
+    expectedCount: expected.length,
+    submittedCount: submitted.length,
+    submitted, outstanding,
+    recent: recent.slice(-10).reverse(),
   });
 });
 

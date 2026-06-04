@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS submissions (
   user_id INTEGER,
   email TEXT,
   fields TEXT,                                 -- JSON array of fields written
+  circuits TEXT,                               -- JSON array of circuits covered
   row_count INTEGER DEFAULT 0,
   submitted_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

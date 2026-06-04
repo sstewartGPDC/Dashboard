@@ -4,7 +4,7 @@
  */
 import * as XLSX from 'xlsx';
 
-const CIRCUITS = [
+export const CIRCUITS = [
   'Alapaha','Alcovy','Appalachian','Atlanta','Atlantic','Augusta','Brunswick',
   'Chattahoochee','Cherokee','Clayton','Conasauga','Columbia','Cordele','Coweta',
   'Dekalb','Dougherty','Dublin','Eastern','Enotah','Flint','Griffin',
