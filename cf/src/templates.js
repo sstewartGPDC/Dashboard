@@ -136,9 +136,9 @@ export function buildDashboardTemplate(fieldKeys) {
 
 // Field key → spreadsheet column label (mirrors the parser's primary aliases).
 const FIELD_LABEL = {
-  total_cases: 'Total Cases', new_cases: 'New Cases', rollover_cases: 'Rollover Cases', closed_cases: 'Closed Cases',
+  total_cases: 'Total Cases', new_cases: 'New Cases', rollover_cases: 'Rollover Cases', closed_cases: 'Closed Cases', custody_rate: 'Custody Rate (%)',
   state_attorneys_filled: 'State Attorneys (Filled)', state_attorneys_vacant: 'State Attorneys (Vacant)', county_attorneys: 'County Attorneys',
-  conflict_new_cases: 'New Conflict Cases', conflict_rollover_cases: 'Rollover Conflict Cases', total_contractors: 'Total Contractors',
+  conflict_total_cases: 'Total Conflict Cases', conflict_new_cases: 'New Conflict Cases', conflict_rollover_cases: 'Rollover Conflict Cases', conflict_closed_cases: 'Closed Conflict Cases', conflict_rate: 'Conflict Rate (%)', total_contractors: 'Total Contractors',
   capital_cases: 'Capital Cases', felony_cases: 'Felony Cases', misdemeanor_cases: 'Misdemeanor Cases', juvenile_cases: 'Juvenile Cases', appeals_cases: 'Appeals', probation_cases: 'Probation Cases',
   investigators: 'Investigators', social_workers: 'Social Workers', paralegals: 'Paralegals', annual_budget: 'Annual Budget', actual_spend: 'Actual Spend',
 };

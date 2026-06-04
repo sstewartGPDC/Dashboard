@@ -2,11 +2,11 @@
 // Sits on top of the merge engine (/api/templates + /api/data/submit).
 
 const FIELD_CATALOG = [
-  { group: 'Cases', fields: [['total_cases', 'Total Cases'], ['new_cases', 'New Cases'], ['rollover_cases', 'Rollover Cases'], ['closed_cases', 'Closed Cases']] },
+  { group: 'Cases', fields: [['total_cases', 'Total Cases'], ['new_cases', 'New Cases'], ['rollover_cases', 'Rollover Cases'], ['closed_cases', 'Closed Cases'], ['custody_rate', 'Custody Rate (%)']] },
   { group: 'Case Types', fields: [['capital_cases', 'Capital Cases'], ['felony_cases', 'Felony Cases'], ['misdemeanor_cases', 'Misdemeanor Cases'], ['juvenile_cases', 'Juvenile Cases'], ['appeals_cases', 'Appeals'], ['probation_cases', 'Probation Cases']] },
   { group: 'Attorneys', fields: [['state_attorneys_filled', 'State Attorneys (Filled)'], ['state_attorneys_vacant', 'State Attorneys (Vacant)'], ['county_attorneys', 'County Attorneys']] },
   { group: 'Support Staff', fields: [['investigators', 'Investigators'], ['social_workers', 'Social Workers'], ['paralegals', 'Paralegals']] },
-  { group: 'Conflict', fields: [['conflict_new_cases', 'New Conflict Cases'], ['conflict_rollover_cases', 'Rollover Conflict Cases'], ['total_contractors', 'Total Contractors']] },
+  { group: 'Conflict', fields: [['conflict_total_cases', 'Total Conflict Cases'], ['conflict_new_cases', 'New Conflict Cases'], ['conflict_rollover_cases', 'Rollover Conflict Cases'], ['conflict_closed_cases', 'Closed Conflict Cases'], ['conflict_rate', 'Conflict Rate (%)'], ['total_contractors', 'Total Contractors']] },
   { group: 'Financials', fields: [['annual_budget', 'Annual Budget'], ['actual_spend', 'Actual Spend']] },
 ];
 const FIELD_LABEL_MAP = Object.fromEntries(FIELD_CATALOG.flatMap((g) => g.fields));

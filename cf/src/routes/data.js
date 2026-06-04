@@ -15,8 +15,8 @@ const data = new Hono();
 
 const TEMP_TTL = 3600; // seconds
 const INSERT_CIRCUIT =
-  `INSERT INTO circuit_data (upload_id, circuit, total_cases, new_cases, rollover_cases, closed_cases, state_attorneys_filled, state_attorneys_vacant, county_attorneys, conflict_new_cases, conflict_rollover_cases, total_contractors, capital_cases, felony_cases, misdemeanor_cases, juvenile_cases, appeals_cases, probation_cases, investigators, social_workers, paralegals, annual_budget, actual_spend)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  `INSERT INTO circuit_data (upload_id, circuit, total_cases, new_cases, rollover_cases, closed_cases, custody_rate, state_attorneys_filled, state_attorneys_vacant, county_attorneys, conflict_total_cases, conflict_new_cases, conflict_rollover_cases, conflict_closed_cases, conflict_rate, total_contractors, capital_cases, felony_cases, misdemeanor_cases, juvenile_cases, appeals_cases, probation_cases, investigators, social_workers, paralegals, annual_budget, actual_spend)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 function xlsxResponse(bytes, filename) {
   return new Response(bytes, {
@@ -37,9 +37,9 @@ function currentFiscalYear() {
 
 // All upsertable metric columns on circuit_data.
 const CIRCUIT_FIELDS = [
-  'total_cases', 'new_cases', 'rollover_cases', 'closed_cases',
+  'total_cases', 'new_cases', 'rollover_cases', 'closed_cases', 'custody_rate',
   'state_attorneys_filled', 'state_attorneys_vacant', 'county_attorneys',
-  'conflict_new_cases', 'conflict_rollover_cases', 'total_contractors',
+  'conflict_total_cases', 'conflict_new_cases', 'conflict_rollover_cases', 'conflict_closed_cases', 'conflict_rate', 'total_contractors',
   'capital_cases', 'felony_cases', 'misdemeanor_cases', 'juvenile_cases', 'appeals_cases', 'probation_cases',
   'investigators', 'social_workers', 'paralegals', 'annual_budget', 'actual_spend',
 ];

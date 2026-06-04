@@ -7,11 +7,15 @@ const EXPECTED_FIELDS = [
   { key: 'new_cases', label: 'New Cases', hint: 'Cases opened this period' },
   { key: 'rollover_cases', label: 'Rollover Cases', hint: 'Carried over from prior period' },
   { key: 'closed_cases', label: 'Closed Cases', hint: 'Cases resolved this period' },
+  { key: 'custody_rate', label: 'Custody Rate (%)', hint: 'Percent of clients in custody' },
   { key: 'state_attorneys_filled', label: 'State Attorneys (Filled)', hint: 'GPDC-funded filled positions' },
   { key: 'state_attorneys_vacant', label: 'State Attorneys (Vacant)', hint: 'GPDC-funded vacant positions' },
   { key: 'county_attorneys', label: 'County Attorneys', hint: 'County-funded attorney count' },
+  { key: 'conflict_total_cases', label: 'Total Conflict Cases', hint: 'Total conflict caseload' },
   { key: 'conflict_new_cases', label: 'New Conflict Cases', hint: 'Conflict division new cases' },
   { key: 'conflict_rollover_cases', label: 'Rollover Conflict Cases', hint: 'Conflict division rollover' },
+  { key: 'conflict_closed_cases', label: 'Closed Conflict Cases', hint: 'Conflict cases resolved this period' },
+  { key: 'conflict_rate', label: 'Conflict Rate (%)', hint: 'Percent of cases referred to conflict' },
   { key: 'total_contractors', label: 'Total Contractors', hint: 'Contract attorneys (CP/C3)' }
 ];
 
@@ -22,11 +26,15 @@ const FIELD_ALIASES = {
   new_cases: ['New Cases', 'new_cases'],
   rollover_cases: ['Rollover Cases', 'Rolleover Cases', 'rollover_cases'],
   closed_cases: ['Closed Cases', 'closed_cases'],
+  custody_rate: ['Custody Rate (%)', 'Custody Rate', 'custody_rate'],
   state_attorneys_filled: ['State Attorneys (Filled)', 'state_attorneys_filled'],
   state_attorneys_vacant: ['State Attorneys (Vacant)', 'state_attorneys_vacant'],
   county_attorneys: ['County Attorneys', 'county_attorneys'],
+  conflict_total_cases: ['Total Conflict Cases', 'Conflict Total Cases', 'conflict_total_cases'],
   conflict_new_cases: ['New Conflict Cases', 'Conflict New Cases', 'conflict_new_cases'],
   conflict_rollover_cases: ['Rollover Conflict Cases', 'rollover_conflict_cases'],
+  conflict_closed_cases: ['Closed Conflict Cases', 'Conflict Closed Cases', 'conflict_closed_cases'],
+  conflict_rate: ['Conflict Rate (%)', 'Conflict Rate', 'conflict_rate'],
   total_contractors: ['Total C2 Contractors', 'Total Contractors (CP and C3)', 'total_contractors']
 };
 
@@ -63,9 +71,9 @@ function invertAutoMap(autoMap) {
 function buildFieldOptions(selectedKey) {
   const groups = [
     { label: 'Required', fields: EXPECTED_FIELDS.filter(f => f.required) },
-    { label: 'Cases', fields: EXPECTED_FIELDS.filter(f => ['total_cases','new_cases','rollover_cases','closed_cases'].includes(f.key)) },
+    { label: 'Cases', fields: EXPECTED_FIELDS.filter(f => ['total_cases','new_cases','rollover_cases','closed_cases','custody_rate'].includes(f.key)) },
     { label: 'Staffing', fields: EXPECTED_FIELDS.filter(f => ['state_attorneys_filled','state_attorneys_vacant','county_attorneys'].includes(f.key)) },
-    { label: 'Conflict', fields: EXPECTED_FIELDS.filter(f => ['conflict_new_cases','conflict_rollover_cases','total_contractors'].includes(f.key)) },
+    { label: 'Conflict', fields: EXPECTED_FIELDS.filter(f => ['conflict_total_cases','conflict_new_cases','conflict_rollover_cases','conflict_closed_cases','conflict_rate','total_contractors'].includes(f.key)) },
   ];
   let html = '<option value="">— Skip —</option>';
   for (const g of groups) {

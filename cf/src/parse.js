@@ -12,11 +12,15 @@ export const DEFAULT_MAPPINGS = {
   rollover_cases: ['Rollover Cases', 'Rolleover Cases', 'rollover_cases'],
   new_cases: ['New Cases', 'new_cases'],
   closed_cases: ['Closed Cases', 'closed_cases'],
+  custody_rate: ['Custody Rate (%)', 'Custody Rate', 'custody_rate'],
   state_attorneys_filled: ['State Attorneys (Filled)', 'state_attorneys_filled'],
   state_attorneys_vacant: ['State Attorneys (Vacant)', 'state_attorneys_vacant'],
   county_attorneys: ['County Attorneys', 'county_attorneys'],
+  conflict_total_cases: ['Total Conflict Cases', 'Conflict Total Cases', 'conflict_total_cases'],
   conflict_new_cases: ['New Conflict Cases', 'Conflict New Cases', 'conflict_new_cases'],
   conflict_rollover_cases: ['Rollover Conflict Cases', 'rollover_conflict_cases'],
+  conflict_closed_cases: ['Closed Conflict Cases', 'Conflict Closed Cases', 'conflict_closed_cases'],
+  conflict_rate: ['Conflict Rate (%)', 'Conflict Rate', 'conflict_rate'],
   total_contractors: ['Total C2 Contractors', 'Total Contractors (CP and C3)', 'Total Contractors', 'total_contractors'],
   // Case-type breakdown (weighted caseload)
   capital_cases: ['Capital Cases', 'Death Penalty Cases', 'capital_cases'],
@@ -34,10 +38,10 @@ export const DEFAULT_MAPPINGS = {
   actual_spend: ['Actual Spend', 'Expenditures', 'Spend', 'actual_spend'],
 };
 
-// Numeric parse that tolerates "$1,234.56" style budget figures.
+// Numeric parse that tolerates "$1,234.56" budgets and "12.5%" rate figures.
 function num(v) {
   if (v == null || v === '') return 0;
-  const n = parseFloat(String(v).replace(/[$,]/g, ''));
+  const n = parseFloat(String(v).replace(/[$,%]/g, ''));
   return Number.isFinite(n) ? n : 0;
 }
 
@@ -106,11 +110,15 @@ export function parseExcelBytes(bytes, customMapping = {}) {
       new_cases: newCases,
       rollover_cases: rolloverCases,
       closed_cases: closedCases,
+      custody_rate: num(getField(row, 'custody_rate', customMapping)),
       state_attorneys_filled: stateFilled,
       state_attorneys_vacant: stateVacant,
       county_attorneys: parseInt(getField(row, 'county_attorneys', customMapping)) || 0,
+      conflict_total_cases: parseInt(getField(row, 'conflict_total_cases', customMapping)) || 0,
       conflict_new_cases: parseInt(getField(row, 'conflict_new_cases', customMapping)) || 0,
       conflict_rollover_cases: parseInt(getField(row, 'conflict_rollover_cases', customMapping)) || 0,
+      conflict_closed_cases: parseInt(getField(row, 'conflict_closed_cases', customMapping)) || 0,
+      conflict_rate: num(getField(row, 'conflict_rate', customMapping)),
       total_contractors: parseInt(getField(row, 'total_contractors', customMapping)) || 0,
       capital_cases: num(getField(row, 'capital_cases', customMapping)),
       felony_cases: num(getField(row, 'felony_cases', customMapping)),
