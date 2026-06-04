@@ -359,6 +359,8 @@ async function initApp() {
         manageBtn.style.display = 'flex';
         manageBtn.addEventListener('click', showUserManagement);
       }
+      const mtBtn = $('manageTemplatesUploadBtn');
+      if (mtBtn) mtBtn.style.display = 'inline-flex';
     }
 
     // Read-only viewers: lock the UI and hide all editing entry points. Data
@@ -576,6 +578,12 @@ async function initApp() {
   // 7d. Lock / present mode
   const lockBtn = $('lockToggleBtn');
   if (lockBtn) lockBtn.addEventListener('click', () => { if (typeof toggleLock === 'function') toggleLock(); });
+
+  // 7e. Data collection: submit form + template builder
+  const submitFormBtn = $('submitFormBtn');
+  if (submitFormBtn) submitFormBtn.addEventListener('click', () => { if (typeof openSubmitForm === 'function') openSubmitForm(); });
+  const manageTplBtn = $('manageTemplatesUploadBtn');
+  if (manageTplBtn) manageTplBtn.addEventListener('click', () => { if (typeof openTemplateBuilder === 'function') openTemplateBuilder(); });
 
   // 8. Header dropdowns
   setupDropdown('exportDropdownBtn', 'exportDropdown');

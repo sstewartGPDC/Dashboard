@@ -241,10 +241,9 @@ data.post('/submit', requireEditor(), async (c) => {
 
   const fy = body.fiscalYear != null && body.fiscalYear !== '' ? parseInt(body.fiscalYear, 10) : currentFiscalYear();
   const per = body.period || 'annual';
-  const isShared = body.shared === true || body.shared === 'true';
-  if (isShared && c.get('user').role !== 'admin') {
-    return c.json({ ok: false, error: 'Only admins can submit shared data' }, 403);
-  }
+  // Editors may contribute to the shared dataset via the collection form —
+  // merge only touches their submitted fields, so it can't clobber others.
+  const isShared = body.shared === undefined ? true : (body.shared === true || body.shared === 'true');
 
   const db = c.get('db');
   let fields = Array.isArray(body.fields) ? body.fields : null;
