@@ -10,6 +10,15 @@ const FIELD_CATALOG = [
   { group: 'Financials', fields: [['annual_budget', 'Annual Budget'], ['actual_spend', 'Actual Spend']] },
 ];
 const FIELD_LABEL_MAP = Object.fromEntries(FIELD_CATALOG.flatMap((g) => g.fields));
+
+// Employee-roster columns (a different template "kind": many people per circuit).
+const ROSTER_CATALOG = [
+  ['first_name', 'First Name'], ['last_name', 'Last Name'], ['title', 'Title'],
+  ['email', 'Email'], ['work_phone', 'Work Phone'], ['status', 'Status'],
+];
+const ROSTER_LABEL_MAP = Object.fromEntries(ROSTER_CATALOG);
+const ROSTER_DEFAULT_FIELDS = ROSTER_CATALOG.map(([k]) => k);
+
 let __collectTemplates = [];
 
 function _cbCurrentFY() {
@@ -62,8 +71,8 @@ function cbRenderBuilderList() {
   const rows = __collectTemplates.map((t) => `
     <div class="cb-tpl-row">
       <div class="cb-tpl-main">
-        <div class="cb-tpl-name">${t.name}</div>
-        <div class="cb-tpl-meta">${(t.fields || []).length} fields · ${t.cadence}${t.owner_role ? ' · ' + t.owner_role : ''}</div>
+        <div class="cb-tpl-name">${t.name}${t.kind === 'roster' ? ' <span class="cb-kind-badge">Roster</span>' : ''}</div>
+        <div class="cb-tpl-meta">${(t.fields || []).length} ${t.kind === 'roster' ? 'columns' : 'fields'} · ${t.cadence}${t.owner_role ? ' · ' + t.owner_role : ''}</div>
       </div>
       <div class="cb-tpl-actions">
         <button class="cb-btn-sm" data-status="${t.id}">Status</button>
@@ -83,42 +92,54 @@ function cbRenderBuilderList() {
   }));
 }
 
-function cbShowForm(tpl) {
+function cbShowForm(tpl, kindOverride) {
   const body = document.getElementById('cbBody');
   if (!body) return;
-  const sel = new Set(tpl ? tpl.fields : []);
-  const groups = FIELD_CATALOG.map((g) => `
+  const kind = kindOverride || (tpl && tpl.kind) || 'metric';
+  const isRoster = kind === 'roster';
+  // Default selection: existing template's fields, or (for a new roster) all columns.
+  const sel = new Set(tpl ? tpl.fields : (isRoster ? ROSTER_DEFAULT_FIELDS : []));
+  const catalog = isRoster ? [{ group: 'Employee Columns', fields: ROSTER_CATALOG }] : FIELD_CATALOG;
+  const groups = catalog.map((g) => `
     <div class="cb-fg"><div class="cb-fg-title">${g.group}</div>
       <div class="cb-fg-items">${g.fields.map(([k, l]) => `
-        <label class="cb-chk"><input type="checkbox" value="${k}" ${sel.has(k) ? 'checked' : ''}> ${l}</label>`).join('')}</div>
+        <label class="cb-chk"><input type="checkbox" value="${k}" ${sel.has(k) ? 'checked' : ''} ${isRoster && (k === 'first_name' || k === 'last_name') ? 'checked disabled' : ''}> ${l}</label>`).join('')}</div>
     </div>`).join('');
+  const cad = (tpl && tpl.cadence) || (isRoster ? 'monthly' : 'annual');
   body.innerHTML = `
     <div class="cb-form">
-      <div class="cb-row"><label>Name</label><input id="cbName" type="text" value="${tpl ? tpl.name.replace(/"/g, '&quot;') : ''}" placeholder="e.g. Finance — Annual Budget"></div>
-      <div class="cb-row"><label>Owner / audience</label><input id="cbOwner" type="text" value="${tpl && tpl.owner_role ? tpl.owner_role.replace(/"/g, '&quot;') : ''}" placeholder="e.g. Finance, Circuit PD"></div>
+      <div class="cb-row"><label>Template type</label><select id="cbKind" ${tpl ? 'disabled' : ''}>
+        <option value="metric" ${!isRoster ? 'selected' : ''}>Metrics (numbers per circuit)</option>
+        <option value="roster" ${isRoster ? 'selected' : ''}>Employee Roster (people per circuit)</option>
+      </select>${tpl ? '<span class="cb-hint">Type can\'t be changed after creation.</span>' : ''}</div>
+      <div class="cb-row"><label>Name</label><input id="cbName" type="text" value="${tpl ? tpl.name.replace(/"/g, '&quot;') : ''}" placeholder="${isRoster ? 'e.g. Circuit Staff Directory' : 'e.g. Finance — Annual Budget'}"></div>
+      <div class="cb-row"><label>Owner / audience</label><input id="cbOwner" type="text" value="${tpl && tpl.owner_role ? tpl.owner_role.replace(/"/g, '&quot;') : ''}" placeholder="e.g. Circuit PD office manager"></div>
       <div class="cb-row2">
         <div><label>Cadence</label><select id="cbCadence">
-          <option value="annual" ${!tpl || tpl.cadence === 'annual' ? 'selected' : ''}>Annual</option>
-          <option value="quarterly" ${tpl && tpl.cadence === 'quarterly' ? 'selected' : ''}>Quarterly</option>
-          <option value="monthly" ${tpl && tpl.cadence === 'monthly' ? 'selected' : ''}>Monthly</option>
+          <option value="annual" ${cad === 'annual' ? 'selected' : ''}>Annual</option>
+          <option value="quarterly" ${cad === 'quarterly' ? 'selected' : ''}>Quarterly</option>
+          <option value="monthly" ${cad === 'monthly' ? 'selected' : ''}>Monthly</option>
         </select></div>
         <div><label>Scope</label><select id="cbScope">
           <option value="circuit" ${!tpl || tpl.scope === 'circuit' ? 'selected' : ''}>Per circuit</option>
           <option value="statewide" ${tpl && tpl.scope === 'statewide' ? 'selected' : ''}>Statewide</option>
         </select></div>
       </div>
-      <div class="cb-row"><label>Fields to collect</label><div class="cb-fields">${groups}</div></div>
+      <div class="cb-row"><label>${isRoster ? 'Columns to collect' : 'Fields to collect'}</label><div class="cb-fields">${groups}</div></div>
       <div class="cb-form-actions">
         <button class="cb-btn-ghost" id="cbCancel">Cancel</button>
         <button class="cb-btn-primary" id="cbSave">${tpl ? 'Save changes' : 'Create template'}</button>
       </div>
     </div>`;
   body.querySelector('#cbCancel').addEventListener('click', cbRenderBuilderList);
+  // Switching type on a NEW template re-renders the field catalog.
+  const kindSel = body.querySelector('#cbKind');
+  if (kindSel && !tpl) kindSel.addEventListener('change', () => cbShowForm(null, kindSel.value));
   body.querySelector('#cbSave').addEventListener('click', async () => {
     const name = document.getElementById('cbName').value.trim();
     if (!name) { alert('Name is required'); return; }
     const fields = Array.from(body.querySelectorAll('.cb-chk input:checked')).map((i) => i.value);
-    const payload = { name, ownerRole: document.getElementById('cbOwner').value.trim(), cadence: document.getElementById('cbCadence').value, scope: document.getElementById('cbScope').value, fields };
+    const payload = { name, kind, ownerRole: document.getElementById('cbOwner').value.trim(), cadence: document.getElementById('cbCadence').value, scope: document.getElementById('cbScope').value, fields };
     const url = tpl ? 'api/templates/' + tpl.id : 'api/templates';
     const method = tpl ? 'PUT' : 'POST';
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -179,6 +200,7 @@ async function cbBuildSubmitGrid(m) {
   const grid = m.querySelector('#sfGrid');
   const t = __collectTemplates.find((x) => String(x.id) === m.querySelector('#sfTemplate').value);
   if (!t || !t.fields.length) { grid.innerHTML = '<div class="cb-empty">This template has no fields.</div>'; return; }
+  if (t.kind === 'roster') return cbBuildRosterEditor(m, t);
   const fy = m.querySelector('#sfFY').value;
   const period = m.querySelector('#sfPeriod').value;
   const onlyCircuit = m.querySelector('#sfCircuit').value;
@@ -203,9 +225,76 @@ async function cbBuildSubmitGrid(m) {
   grid.innerHTML = `<table class="cb-sf-table"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
 }
 
+// ── Roster editor (employee-list templates) ──────────────────────────
+function cbRosterRowHtml(cols, emp) {
+  emp = emp || {};
+  return `<tr class="cb-rost-row">${cols.map((f) => `<td><input type="${f === 'email' ? 'email' : 'text'}" data-field="${f}" value="${emp[f] != null ? String(emp[f]).replace(/"/g, '&quot;') : ''}" placeholder="${ROSTER_LABEL_MAP[f] || f}"></td>`).join('')}<td><button class="cb-rost-del" title="Remove">&times;</button></td></tr>`;
+}
+
+async function cbBuildRosterEditor(m, t) {
+  const grid = m.querySelector('#sfGrid');
+  const fy = m.querySelector('#sfFY').value;
+  const period = m.querySelector('#sfPeriod').value;
+  const circuit = m.querySelector('#sfCircuit').value;
+  const cols = t.fields && t.fields.length ? t.fields : ROSTER_DEFAULT_FIELDS;
+  if (!circuit) {
+    grid.innerHTML = '<div class="cb-empty">Pick a single circuit above to edit its staff roster.</div>';
+    return;
+  }
+  grid.innerHTML = '<div class="cb-empty">Loading current roster…</div>';
+  let people = [];
+  try {
+    const res = await fetch(`api/roster?fy=${fy}&period=${encodeURIComponent(period)}&circuit=${encodeURIComponent(circuit)}`);
+    const data = await res.json();
+    people = (data.ok && data.employees) ? data.employees : [];
+  } catch (e) { /* fresh period */ }
+
+  const head = `<tr>${cols.map((f) => `<th>${ROSTER_LABEL_MAP[f] || f}</th>`).join('')}<th></th></tr>`;
+  const bodyRows = (people.length ? people : [{}]).map((p) => cbRosterRowHtml(cols, p)).join('');
+  grid.innerHTML = `
+    <div class="cb-rost-head">Editing <b>${circuit}</b> — ${people.length} person(s) on file. Submitting replaces this circuit's roster for the period.</div>
+    <table class="cb-sf-table cb-rost-table"><thead>${head}</thead><tbody id="cbRostBody">${bodyRows}</tbody></table>
+    <button class="cb-btn-sm" id="cbRostAdd" style="margin-top:8px">+ Add person</button>`;
+  grid.querySelector('#cbRostAdd').addEventListener('click', () => {
+    grid.querySelector('#cbRostBody').insertAdjacentHTML('beforeend', cbRosterRowHtml(cols, {}));
+  });
+  grid.addEventListener('click', (e) => {
+    if (e.target.classList && e.target.classList.contains('cb-rost-del')) {
+      const tr = e.target.closest('tr'); if (tr) tr.remove();
+    }
+  });
+}
+
+async function cbSubmitRoster(m, t) {
+  const fy = parseInt(m.querySelector('#sfFY').value, 10) || _cbCurrentFY();
+  const period = m.querySelector('#sfPeriod').value || 'annual';
+  const circuit = m.querySelector('#sfCircuit').value;
+  if (!circuit) { alert('Select a single circuit to submit its roster.'); return; }
+  const cols = t.fields && t.fields.length ? t.fields : ROSTER_DEFAULT_FIELDS;
+  const people = [];
+  m.querySelectorAll('#cbRostBody tr').forEach((tr) => {
+    const person = {};
+    let any = false;
+    tr.querySelectorAll('input[data-field]').forEach((inp) => { person[inp.dataset.field] = inp.value.trim(); if (inp.value.trim()) any = true; });
+    if (any) people.push(person);
+  });
+  const btn = m.querySelector('#sfSubmit');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  try {
+    const res = await fetch('api/roster/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fiscalYear: fy, period, circuit, people }) });
+    const r = await res.json();
+    if (!r.ok) { alert(r.error || 'Submit failed'); btn.disabled = false; btn.textContent = 'Submit'; return; }
+    m.remove();
+    alert(`Saved ${r.count} staff member(s) for ${circuit} — FY${String(fy).slice(-2)} ${period === 'annual' ? '' : period}.`);
+  } catch (e) {
+    alert('Submit failed: ' + e.message); btn.disabled = false; btn.textContent = 'Submit';
+  }
+}
+
 async function cbSubmit(m) {
   const t = __collectTemplates.find((x) => String(x.id) === m.querySelector('#sfTemplate').value);
   if (!t) return;
+  if (t.kind === 'roster') return cbSubmitRoster(m, t);
   const fy = parseInt(m.querySelector('#sfFY').value, 10) || _cbCurrentFY();
   const period = m.querySelector('#sfPeriod').value || 'annual';
   const byCirc = {};
@@ -261,7 +350,10 @@ async function cbRenderStatus(tpl) {
   body.innerHTML = '<div class="cb-empty">Loading…</div>';
   let d;
   try {
-    const res = await fetch(`api/templates/${tpl.id}/status?fy=${fy}&period=${encodeURIComponent(period)}`);
+    const url = tpl.kind === 'roster'
+      ? `api/roster/status?fy=${fy}&period=${encodeURIComponent(period)}`
+      : `api/templates/${tpl.id}/status?fy=${fy}&period=${encodeURIComponent(period)}`;
+    const res = await fetch(url);
     d = await res.json();
   } catch (e) { body.innerHTML = '<div class="cb-empty">Failed to load status.</div>'; return; }
   if (!d.ok) { body.innerHTML = '<div class="cb-empty">' + (d.error || 'Failed') + '</div>'; return; }

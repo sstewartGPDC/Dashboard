@@ -12,6 +12,7 @@ import authRoutes from './routes/auth.js';
 import dataRoutes from './routes/data.js';
 import dashboardRoutes from './routes/dashboards.js';
 import templateRoutes from './routes/templates.js';
+import rosterRoutes from './routes/roster.js';
 
 const app = new Hono();
 
@@ -26,6 +27,7 @@ app.route('/api/auth', authRoutes);
 app.route('/api/data', dataRoutes);
 app.route('/api/dashboards', dashboardRoutes);
 app.route('/api/templates', templateRoutes);
+app.route('/api/roster', rosterRoutes);
 
 // Unknown /api path → JSON 404 (not the SPA).
 app.all('/api/*', (c) => c.json({ ok: false, error: 'Not found' }, 404));

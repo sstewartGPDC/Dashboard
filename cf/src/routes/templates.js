@@ -4,8 +4,24 @@
  * list them and download the per-template Excel.
  */
 import { Hono } from 'hono';
+import * as XLSX from 'xlsx';
 import { requireAdmin } from '../access.js';
 import { buildFieldsTemplate, CIRCUITS } from '../templates.js';
+import { ROSTER_FIELDS } from './roster.js';
+
+// A blank roster Excel for a roster-kind template: Circuit + the chosen
+// roster columns + a couple of example rows.
+function buildRosterTemplate(fields) {
+  const chosen = ROSTER_FIELDS.filter((f) => !fields.length || fields.includes(f.key));
+  const cols = ['Circuit', ...chosen.map((f) => f.label)];
+  const ex = { 'First Name': 'Jane', 'Last Name': 'Doe', 'Title': 'Assistant Public Defender', 'Email': 'jdoe@example.org', 'Work Phone': '404-555-0101', 'Status': 'Active' };
+  const rows = [cols, cols.map((c2) => (c2 === 'Circuit' ? 'Atlanta' : (ex[c2] || '')))];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = cols.map((h) => ({ wch: Math.max(h.length + 4, 16) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Roster');
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+}
 
 const templates = new Hono();
 
@@ -37,7 +53,7 @@ templates.get('/:id/xlsx', async (c) => {
   const row = await db.get('SELECT * FROM templates WHERE id = ?', [c.req.param('id')]);
   if (!row) return c.json({ ok: false, error: 'Template not found' }, 404);
   const t = parseTemplate(row);
-  const bytes = buildFieldsTemplate(t.fields);
+  const bytes = t.kind === 'roster' ? buildRosterTemplate(t.fields) : buildFieldsTemplate(t.fields);
   const safe = (t.name || 'Template').replace(/[^a-zA-Z0-9_ -]/g, '').trim().replace(/\s+/g, '_') || 'Template';
   return new Response(bytes, {
     headers: {
@@ -99,9 +115,10 @@ templates.post('/', requireAdmin(), async (c) => {
   if (!b.name) return c.json({ ok: false, error: 'Name is required' }, 400);
   const fields = Array.isArray(b.fields) ? b.fields : [];
   const db = c.get('db');
+  const kind = b.kind === 'roster' ? 'roster' : 'metric';
   const res = await db.run(
-    'INSERT INTO templates (name, description, fields, scope, cadence, owner_role, created_by) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id',
-    [b.name, b.description || '', JSON.stringify(fields), b.scope || 'circuit', b.cadence || 'annual', b.ownerRole || null, c.get('user').id]
+    'INSERT INTO templates (name, description, fields, scope, cadence, kind, owner_role, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id',
+    [b.name, b.description || '', JSON.stringify(fields), b.scope || 'circuit', b.cadence || 'annual', kind, b.ownerRole || null, c.get('user').id]
   );
   return c.json({ ok: true, id: res.lastID });
 });
@@ -119,6 +136,7 @@ templates.put('/:id', requireAdmin(), async (c) => {
   if (b.fields !== undefined) { updates.push('fields = ?'); params.push(JSON.stringify(b.fields || [])); }
   if (b.scope !== undefined) { updates.push('scope = ?'); params.push(b.scope); }
   if (b.cadence !== undefined) { updates.push('cadence = ?'); params.push(b.cadence); }
+  if (b.kind !== undefined) { updates.push('kind = ?'); params.push(b.kind === 'roster' ? 'roster' : 'metric'); }
   if (b.ownerRole !== undefined) { updates.push('owner_role = ?'); params.push(b.ownerRole); }
   if (!updates.length) return c.json({ ok: true });
   updates.push('updated_at = CURRENT_TIMESTAMP');

@@ -16,7 +16,11 @@ const CHART_FIELDS = {
   stateVacant:         { label: 'State Vacant',       group: 'Attorneys', getAgg: a => a.stateVacant,      getCircuit: m => m.stateVacant },
   countyAttorneys:     { label: 'County Attorneys',   group: 'Attorneys', getAgg: a => a.countyAttorneys,  getCircuit: m => m.countyAttorneys },
   conflictNew:         { label: 'Conflict Cases',     group: 'Conflict',  getAgg: a => a.conflict.newCases, getCircuit: m => m.conflict.newCases },
+  conflictTotal:       { label: 'Total Conflict Cases', group: 'Conflict', getAgg: a => a.conflict.totalCases || 0, getCircuit: m => m.conflict.totalCases || 0 },
+  conflictClosed:      { label: 'Closed Conflict Cases', group: 'Conflict', getAgg: a => a.conflict.closed || 0, getCircuit: m => m.conflict.closed || 0 },
+  conflictRate:        { label: 'Conflict Rate',       group: 'Conflict',  getAgg: a => a.conflict.rate || 0, getCircuit: m => (m.conflict.rate || 0) / 100 },
   conflictContractors: { label: 'Contractors',        group: 'Conflict',  getAgg: a => a.conflict.totalContractors, getCircuit: m => m.conflict.totalContractors },
+  custodyRate:         { label: 'Custody Rate',        group: 'Computed',  getAgg: a => a.custodyRate || 0, getCircuit: m => (m.custodyRate || 0) / 100 },
   // Computed
   totalAttorneys:      { label: 'Total Attorneys',    group: 'Attorneys', getAgg: a => a.stateFilled + a.countyAttorneys, getCircuit: m => m.stateFilled + m.countyAttorneys },
   caseload:            { label: 'Caseload / Attorney', group: 'Computed', getAgg: a => { const t = a.stateFilled + a.countyAttorneys; return t > 0 ? a.totalCases / t : 0; }, getCircuit: m => { const t = m.stateFilled + m.countyAttorneys; return t > 0 ? m.totalCases / t : 0; } },
@@ -1293,9 +1297,17 @@ const chartEngine = {
       layout.push({ id: nextId(), type: 'donut', title: 'Attorney Distribution', subtitle: 'State vs county positions', width: 'medium', segments: [{ field: 'stateFilled', label: 'State (GPDC)', color: '#c4714e' }, { field: 'countyAttorneys', label: 'County', color: '#e2b77a' }], centerLabel: 'Total' });
     }
 
+    // If custody-rate data is present
+    if (agg.custodyRate > 0) {
+      layout.push({ id: nextId(), type: 'kpi', title: 'Custody Rate', width: 'small', field: 'custodyRate', icon: 'percent', format: 'percent', subtitle: 'Clients in custody (case-weighted)' });
+    }
+
     // If conflict data is present
-    if (agg.conflict && agg.conflict.newCases > 0) {
+    if (agg.conflict && (agg.conflict.newCases > 0 || agg.conflict.totalCases > 0)) {
       layout.push({ id: nextId(), type: 'kpi', title: 'Conflict Cases', width: 'small', field: 'conflictNew', icon: 'shield', format: 'number', subtitle: 'Conflict division cases' });
+    }
+    if (agg.conflict && agg.conflict.rate > 0) {
+      layout.push({ id: nextId(), type: 'kpi', title: 'Conflict Rate', width: 'small', field: 'conflictRate', icon: 'percent', format: 'percent', subtitle: 'Cases referred to conflict (case-weighted)' });
     }
 
     // If cases: case flow donut

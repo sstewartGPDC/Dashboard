@@ -30,18 +30,25 @@ function getFilteredCircuits() { return CIRCUITS.filter(c => (ui.circuit === "Al
 function aggregateMetricsFrom(map, filteredCircuits) {
   const agg = {
     totalCases: 0, newCases: 0, closed: 0, stateFilled: 0, stateVacant: 0, countyAttorneys: 0,
-    conflict: { newCases: 0, totalContractors: 0 },
+    conflict: { totalCases: 0, newCases: 0, closed: 0, totalContractors: 0, rate: 0 },
+    custodyRate: 0,
     capitalCases: 0, felonyCases: 0, misdemeanorCases: 0, juvenileCases: 0, appealsCases: 0, probationCases: 0,
     investigators: 0, socialWorkers: 0, paralegals: 0, annualBudget: 0, actualSpend: 0,
   };
+  // Rates can't be summed — accumulate case-weighted numerators, divide at the end.
+  let custodyW = 0, custodyN = 0, conflictW = 0, conflictN = 0;
   for (const c of filteredCircuits) {
     const m = map && map.get(c.circuit);
     if (!m) continue;
     agg.totalCases += m.totalCases; agg.newCases += m.newCases; agg.closed += m.closed;
     agg.stateFilled += m.stateFilled; agg.stateVacant += m.stateVacant;
     agg.countyAttorneys += m.countyAttorneys;
+    agg.conflict.totalCases += m.conflict.totalCases || 0;
     agg.conflict.newCases += m.conflict.newCases;
+    agg.conflict.closed += m.conflict.closed || 0;
     agg.conflict.totalContractors += m.conflict.totalContractors;
+    if (m.custodyRate > 0) { custodyN += m.custodyRate * (m.totalCases || 1); custodyW += (m.totalCases || 1); }
+    if ((m.conflict.rate || 0) > 0) { conflictN += m.conflict.rate * (m.totalCases || 1); conflictW += (m.totalCases || 1); }
     agg.capitalCases += m.capitalCases || 0; agg.felonyCases += m.felonyCases || 0;
     agg.misdemeanorCases += m.misdemeanorCases || 0; agg.juvenileCases += m.juvenileCases || 0;
     agg.appealsCases += m.appealsCases || 0; agg.probationCases += m.probationCases || 0;
@@ -49,6 +56,9 @@ function aggregateMetricsFrom(map, filteredCircuits) {
     agg.paralegals += m.paralegals || 0;
     agg.annualBudget += m.annualBudget || 0; agg.actualSpend += m.actualSpend || 0;
   }
+  // Stored as fractions (0–1) so the 'percent' card format renders them correctly.
+  agg.custodyRate = custodyW > 0 ? (custodyN / custodyW) / 100 : 0;
+  agg.conflict.rate = conflictW > 0 ? (conflictN / conflictW) / 100 : 0;
   return agg;
 }
 function aggregateMetrics(filteredCircuits) { return aggregateMetricsFrom(CIRCUIT_METRICS, filteredCircuits); }
