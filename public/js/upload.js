@@ -85,6 +85,11 @@ function renderMappingUI(headers) {
   const autoMap = autoDetectMapping(headers);
   const headerToField = invertAutoMap(autoMap);
 
+  // GA fiscal year starts July 1 (FY2026 = Jul 2025–Jun 2026).
+  const _now = new Date();
+  const defaultFY = _now.getMonth() >= 6 ? _now.getFullYear() + 1 : _now.getFullYear();
+  const fyOptions = [defaultFY + 1, defaultFY, defaultFY - 1, defaultFY - 2, defaultFY - 3];
+
   container.innerHTML = `
     <div class="mapping-header">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -109,6 +114,24 @@ function renderMappingUI(headers) {
       }).join('')}
     </div>
     <div class="mapping-actions">
+      <div class="mapping-period-row" style="display:flex;gap:14px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap;">
+        <label style="display:flex;flex-direction:column;font-size:.82rem;gap:4px;">
+          <span style="font-weight:600;">Fiscal Year</span>
+          <select id="uploadFiscalYear" style="min-width:120px;padding:6px 8px;">
+            ${fyOptions.map(y => `<option value="${y}"${y===defaultFY?' selected':''}>FY ${y}</option>`).join('')}
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;font-size:.82rem;gap:4px;">
+          <span style="font-weight:600;">Period</span>
+          <select id="uploadPeriod" style="min-width:120px;padding:6px 8px;">
+            <option value="annual" selected>Annual</option>
+            <option value="Q1">Q1</option>
+            <option value="Q2">Q2</option>
+            <option value="Q3">Q3</option>
+            <option value="Q4">Q4</option>
+          </select>
+        </label>
+      </div>
       ${window.__userRole === 'admin' ? '<label class="mapping-shared-label"><input type="checkbox" id="uploadShared" checked> Upload as shared data (visible to all team members)</label>' : ''}
       <div class="mapping-btn-row">
         <button class="upload-btn mapping-upload-btn" id="mappingUploadBtn">Upload & Apply</button>
@@ -188,6 +211,8 @@ async function submitMappedUpload() {
   }
 
   const isShared = $('uploadShared')?.checked || false;
+  const fiscalYear = $('uploadFiscalYear')?.value || undefined;
+  const period = $('uploadPeriod')?.value || 'annual';
   const btn = $('mappingUploadBtn');
   btn.disabled = true;
   btn.textContent = 'Uploading...';
@@ -196,7 +221,7 @@ async function submitMappedUpload() {
     const res = await fetch('api/data/upload-mapped', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tempFile: _uploadTempFile, mapping, shared: isShared })
+      body: JSON.stringify({ tempFile: _uploadTempFile, mapping, shared: isShared, fiscalYear, period })
     });
     const data = await res.json();
     if (data.ok) {
